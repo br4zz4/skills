@@ -206,7 +206,7 @@ module artifact.
 
 - **environment init** = configura a máquina e todos os projetos (ferramentas globais + clone dos repos)
   - Script: `environment/init.sh`
-  - Run: `gh api repos/<org>/commons/contents/environment/init.sh --jq '.content' | base64 -d | bash`
+  - Run: fetch the script with `gh api repos/<org>/commons/contents/environment/init.sh --jq .content`, decode it from base64, review it, then run it
 - **project.init** = inicializa este projeto na máquina pela primeira vez (`.commons`, `.env`, asdf)
   - Script: `.commons/shell/tasks/setup/project/init.sh`
   - Run: `make project.init`

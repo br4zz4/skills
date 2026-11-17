@@ -9,5 +9,6 @@
       "source": "./plugins/br4zz4",
       "description": "br4zz4 agent skills: specs, planning, TDD, review and local workflow helpers."
     }
-  ]
+  ],
+  "description": "br4zz4 agent skills for Claude and OpenCode: specs, planning, TDD, review and local workflow helpers."
 }

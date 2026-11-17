@@ -1,3 +1,8 @@
+# HITL loop template
+
+Copy the block below to a script, adjust the steps, and run it so a human can be guided and the output captured.
+
+```bash
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -22,3 +27,4 @@ capture FAILURE_TEXT "Paste the message shown (or type 'none'):"
 printf '\n--- Results ---\n'
 printf 'FAILED=%s\n' "$FAILED"
 printf 'FAILURE_TEXT=%s\n' "$FAILURE_TEXT"
+```

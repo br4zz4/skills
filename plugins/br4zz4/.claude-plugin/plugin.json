@@ -1,5 +1,10 @@
 {
   "name": "br4zz4",
   "description": "br4zz4 agent skills: specs, planning, TDD, review and local workflow helpers.",
-  "version": "1.0.0"
+  "version": "1.0.0",
+  "author": {
+    "name": "br4zz4"
+  },
+  "license": "MIT",
+  "icon": ".claude-plugin/icon.png"
 }

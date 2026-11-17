@@ -32,7 +32,7 @@ Put in far more effort here than feels proportionate. **Be aggressive, be invent
 7. **Property / fuzz loop.** When the bug is "sometimes the output is wrong", feed 1000 random inputs and watch for the failure mode.
 8. **Bisection harness.** For a bug that crept in between two known states (a commit, dataset, or version), script the cycle of booting at one state and checking it, which lets `git bisect run` do the searching.
 9. **Differential loop.** Pass the same input through the old and new version (or two configs) and diff the outputs.
-10. **HITL bash script.** The last resort. When a human has to click, direct _them_ with `scripts/hitl-loop.template.sh` so the loop stays structured, and the captured output flows back to you.
+10. **HITL bash script.** The last resort. When a human has to click, direct _them_ with `HITL-LOOP.md` so the loop stays structured, and the captured output flows back to you.
 
 With the right feedback loop in hand, 90% of the bug is already fixed.
 
@@ -61,7 +61,7 @@ Phase 1 ends once the loop is **tight** and **red-capable**. That means naming *
 - [ ] **Red-capable**: it exercises the real bug path and asserts the **user's exact symptom**, so it can fail on this bug and pass once fixed. "Runs without erroring" does not count; it has to be able to _catch this specific bug_.
 - [ ] **Deterministic**: the same verdict on every run (for flaky bugs: a pinned, high reproduction rate, as above).
 - [ ] **Fast**: it finishes in seconds rather than minutes.
-- [ ] **Agent-runnable**: it runs unattended, and a human takes part only via `scripts/hitl-loop.template.sh`.
+- [ ] **Agent-runnable**: it runs unattended, and a human takes part only via `HITL-LOOP.md`.
 
 Catching yourself reading code to build a theory before this command exists means **stop: leaping to a hypothesis is precisely the failure this skill exists to prevent.** Without a red-capable command, there is no Phase 2.
 

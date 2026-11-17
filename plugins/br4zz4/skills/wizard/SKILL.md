@@ -7,7 +7,7 @@ description: Produce an interactive bash wizard that guides a human through step
 
 A **wizard** is a bash script that leads a human through a manual procedure, one step at a time: the kind of procedure that is boring to do by hand and boring to explain to an AI over and over. It opens each URL, states exactly what to click and copy, captures the values, stores them where they belong (`.env`, GitHub secrets), asks for confirmation at every stage, and shows how many stages remain. It can configure third-party services, run a one-off migration, or move a project from one state to another (say, setting up Rails credentials for a new environment).
 
-The pleasant UX is already solved by [template.sh](template.sh): progress per stage, confirmation gates, URL opening on any platform (WSL included), hidden entry of secrets, idempotent `.env` upserts, `gh secret` and `gh variable` writes, and a closing summary. **You only scope the procedure and write its stages.** The library (everything before the final `TOTAL_STAGES=1` block, whose banner and example stage you replace) is the same in every wizard, and that sameness is intentional: never edit it by hand.
+The pleasant UX is already solved by [TEMPLATE.md](TEMPLATE.md): progress per stage, confirmation gates, URL opening on any platform (WSL included), hidden entry of secrets, idempotent `.env` upserts, `gh secret` and `gh variable` writes, and a closing summary. **You only scope the procedure and write its stages.** The library (everything before the final `TOTAL_STAGES=1` block, whose banner and example stage you replace) is the same in every wizard, and that sameness is intentional: never edit it by hand.
 
 By default a wizard is disposable: made for a single run, saved in a scratch path or under `scripts/`, and deleted when the job is done. Commit it only if the user wants a repeatable setup path to live in the repo.
 
@@ -32,7 +32,7 @@ For every stage, write the exact path a human follows: the URL to open, what to 
 
 ### 3. Write the wizard
 
-Copy `template.sh` to the target path. Swap the example stage for one `stage` per step, in dependency order. Use the library helpers: `stage`, `say`/`step`, `open_url`, `ask`/`ask_secret`, `write_env`, `set_secret`/`set_var`, `pause`/`confirm`. Set `TOTAL_STAGES` to the count of stages you wrote.
+Copy the script from `TEMPLATE.md` to the target path and make it executable. Swap the example stage for one `stage` per step, in dependency order. Use the library helpers: `stage`, `say`/`step`, `open_url`, `ask`/`ask_secret`, `write_env`, `set_secret`/`set_var`, `pause`/`confirm`. Set `TOTAL_STAGES` to the count of stages you wrote.
 
 Keep to the standard the template sets: open the URL before asking for its value, use `ask_secret` for anything secret, call `write_env` for every value that must persist, call `set_secret` only for values CI really needs, and use `confirm` ahead of any irreversible action. Every `stage` clears the screen so only the current step shows: keep each stage to one focused task so nothing the human needs scrolls out of view. Leave the library part of the file alone.
 

@@ -1,3 +1,8 @@
+# Wizard template
+
+Copy the block below to the target path, save it as an executable script, and adapt the stages.
+
+```bash
 #!/usr/bin/env bash
 
 set -euo pipefail
@@ -166,3 +171,4 @@ write_env STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"
 set_secret STRIPE_SECRET_KEY "$STRIPE_SECRET_KEY"
 
 finish
+```
