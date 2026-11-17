@@ -8,6 +8,12 @@ Agent skills for Claude (web, desktop, mobile, Claude Code) and OpenCode, shippe
 2. Enter `br4zz4/skills`.
 3. Add the plugin `br4zz4` and turn on **Sync automatically**.
 
+Claude Code CLI alternative (installs on that machine only; do not combine it with the account sync, or each skill shows up twice):
+
+```
+/plugin install br4zz4 --marketplace br4zz4/skills
+```
+
 The plugin is saved to your account, so it reaches chat (web, desktop, mobile), Cowork and Claude Code signed in with the same account.
 
 ## Layout

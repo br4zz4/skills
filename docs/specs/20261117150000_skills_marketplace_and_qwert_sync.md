@@ -247,6 +247,13 @@ grep -rhFxf $TMPDIR/orig_lines.txt plugins/br4zz4/skills
 
 **Passo manual do usuário (depois do push):** no claude.ai, Customize → Plugins → Add marketplace `br4zz4/skills` → adicionar o plugin `br4zz4` → ligar "Sync automatically". Conferir no mobile e no app do Mac e, no Claude Code, `/reload-plugins` + `/skills`.
 
+## Ajustes pós-review
+
+- Skills públicas anonimizadas (nomes de cliente, paths locais, org privada).
+- Scripts `.sh` das skills viraram `TEMPLATE.md` e `HITL-LOOP.md` (blocos de código), para o plugin conter só Markdown, JSON e PNG.
+- Adicionados `LICENSE` (MIT), `author`, `license`, `icon` e `description` do marketplace, para passar no `claude plugin validate`.
+- Sync: lock com PID e expiração, guard de origin e erro explícito no `git clean`.
+
 ## Fase 4 — Recipe `br4zz4-skills` com daily sync (repo: `~/.qwert`)
 
 **Entrega:** Synced copy, OpenCode links e agendamento diário. As skills antigas continuam visíveis via link `legacy`.
