@@ -46,6 +46,8 @@ Cada hook é **obrigatório**. Um hook sem nada a fazer printa por quê e sai 0.
 
 O hook roda com o diretório do lado (`code/` ou `infra/`) como pwd e recebe `MODULE`, `ENVIRONMENT`, `TAG`, `CI_CACHE_DIR` e os secrets do escopo ward.
 
+O hook é a implementação: o `make <módulo>.<step>` do `br4zz4/commons` roda o mesmo script localmente, com o mesmo pwd e as mesmas variáveis. Todo checkout dos reusables usa `submodules: recursive`, para o `.commons` estar disponível aos hooks de `apply` (`.commons/bin/commons secrets <módulo>`).
+
 ### Pipeline — fluxo resumido
 
 ```

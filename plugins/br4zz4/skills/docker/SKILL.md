@@ -1,229 +1,33 @@
 ---
 name: docker
 description: Use when creating or reviewing Docker files.
-version: 2.2.0
+version: 3.0.0
 ---
 
-# commons:docker
+# br4zz4:docker
 
-> **TLDR**: Every project has a thin `compose.yml` that delegates to `.project/docker/compose/services.yml`. The stacks in `.commons/docker/compose/stacks/` expose `x-stack-base` — projects extend it to define their services. `depends_on` always goes on the service, never on the base. Volumes of installed deps belong to the stack file; project-specific volumes belong to the service.
+> **TLDR**: o `compose.yml` do projeto só inclui os fragments de serviços do `br4zz4/commons` (`database`, `cache`, `mail`) e, se precisar, define os serviços próprios do projeto. O app roda no host com `mise`; não há stack, imagem nem serviço de dev no commons. O `Dockerfile` existe só para a imagem da release, construída pelo hook `build`.
 
-## The pattern
-
-### `compose.yml` — root, always thin
-
-```yaml
-name: <project-name>
-
-include:
-  - path:
-      - ${COMMONS_DIR}/docker/compose/shared/database.yml  # if needed
-      - .project/docker/compose/services.yml
-```
-
-- Only declares what shared infrastructure the project needs
-- Never defines services here
-- Always uses `${COMMONS_DIR}` (not `.commons/`)
-
-### `.project/docker/compose/services.yml` — all project services
-
-This is the only place services are defined. It includes the stacks it needs and extends `x-stack-base` from them.
-
-**Single-module (Ruby + database):**
+## compose.yml
 
 ```yaml
 include:
-  - path:
-      - ${COMMONS_DIR}/docker/compose/stacks/ruby.yml
-
-x-service-base: &service-base
-  extends:
-    file: ${COMMONS_DIR}/docker/compose/stacks/ruby.yml
-    service: x-stack-base
-
-services:
-  app:
-    <<: *service-base
-    ports:
-      - "${PORT}:${PORT}"
-    depends_on:
-      database:
-        condition: service_healthy
-
-  worker:
-    <<: *service-base
-    environment:
-      RUNTIME_MODE: worker
-    depends_on:
-      database:
-        condition: service_healthy
+  - .commons/compose/database.yml
+  - .commons/compose/cache.yml
+  - .commons/compose/mail.yml
 ```
 
-**Multi-module (Ruby backend + React frontend):**
+- Compose ≥ 2.20 (`include:`). `make up` sobe com `--wait`; `make down` mantém os volumes.
+- Fragments: `database` (`postgres:16-alpine`), `cache` (`redis:7-alpine`), `mail` (`mailpit`, só local). As mesmas imagens e credenciais dos serviços do CI.
+- Portas por variável (`COMMONS_DB_PORT`, `COMMONS_CACHE_PORT`, `COMMONS_MAIL_PORT`, `COMMONS_SMTP_PORT`). O commons não monta `DATABASE_URL`: esse valor vem do escopo ward de development do projeto.
+- `bin/init` do commons gera o `compose.yml` a partir dos `services` do `.github/modules.json`.
+- Serviço que o commons não oferece: o projeto o define no próprio `compose.yml`. Quando dois projetos repetirem o mesmo, ele vira fragment do commons.
+- O commons não tem stacks nem variável de diretório: o caminho é `.commons/compose/<fragment>.yml`.
 
-```yaml
-include:
-  - path:
-      - ${COMMONS_DIR}/docker/compose/stacks/ruby.yml
-      - ${COMMONS_DIR}/docker/compose/stacks/react.yml
+## Dockerfile
 
-x-backend-base: &backend-base
-  extends:
-    file: ${COMMONS_DIR}/docker/compose/stacks/ruby.yml
-    service: x-stack-base
-  working_dir: /source/modules/backend/code
-
-x-frontend-base: &frontend-base
-  extends:
-    file: ${COMMONS_DIR}/docker/compose/stacks/react.yml
-    service: x-stack-base
-  working_dir: /source/modules/frontend/code
-  volumes:
-    - node_modules:/source/modules/frontend/code/node_modules
-
-services:
-  backend-api:
-    <<: *backend-base
-    environment:
-      PORT: ${API_PORT}
-    ports:
-      - "${API_PORT}:${API_PORT}"
-    depends_on:
-      database:
-        condition: service_healthy
-
-  backend-worker:
-    <<: *backend-base
-    environment:
-      RUNTIME_MODE: worker
-    depends_on:
-      database:
-        condition: service_healthy
-
-  frontend-web:
-    <<: *frontend-base
-    ports:
-      - "${WEB_PORT}:${WEB_PORT}"
-
-volumes:
-  node_modules:
-    driver: local
-```
-
-## Stack files — what they provide
-
-Stack files live in `.commons/docker/compose/stacks/` and expose `x-stack-base` — a YAML anchor projects extend. They define only what belongs to the stack: build args, installed-deps volume, and mount path.
-
-| Stack file | `STACK` | Volume it defines |
-|---|---|---|
-| `_base.yml` | — | `x-base` (build context, env_file, source mount) |
-| `ruby.yml` | `ruby` | `bundle_cache:/usr/local/bundle` |
-| `react.yml` | `node` | `node_modules:/source/node_modules` |
-| `elixir.yml` | `elixir` | `build_cache:/_build`, `deps_cache:/deps` |
-| `python.yml` | `python` | `.venv` volume |
-
-Projects never re-declare these volumes — they come from the stack file via `include`.
-
-**Exception — multi-module node_modules:** When a React module lives under `modules/frontend/code/`, the default volume path (`/source/node_modules`) is wrong. Override only the volume mount in the base anchor:
-
-```yaml
-x-frontend-base: &frontend-base
-  extends:
-    file: ${COMMONS_DIR}/docker/compose/stacks/react.yml
-    service: x-stack-base
-  working_dir: /source/modules/frontend/code
-  volumes:
-    - node_modules:/source/modules/frontend/code/node_modules  # override path only
-```
-
-And declare the volume in the project file:
-
-```yaml
-volumes:
-  node_modules:
-    driver: local
-```
-
-## Rules
-
-| Rule | Detail |
-|---|---|
-| `depends_on` goes on the service | Never on the base anchor — the base doesn't know what dependencies the project has |
-| Installed-deps volumes go in the stack | `bundle_cache`, `node_modules` (default path) belong in the stack file |
-| Project-specific volumes go on the service | Path overrides for multi-module, or project-specific mounts |
-| `working_dir` goes on the base anchor | When all services of a module share the same working dir |
-| Never define infrastructure services in `.project/` | PostgreSQL, Redis, RabbitMQ always come from `.commons/docker/compose/shared/` |
-| Always use `${COMMONS_DIR}` | Never `.commons/` — the var is exported by `~/.zshrc` |
-| Always use `path:` array in `include:` | Never bare strings |
-| Never default env vars | `${VAR:-default}` in compose, `${VAR:-default}` in scripts, and `ENV.fetch("X", default)` in code are all forbidden — a missing var must fail loudly. Only add a default when explicitly requested. See `@rules/shared/env.md` |
-| Use `WEB_PORT` and `API_PORT` | Never `PORT` or `BACKEND_PORT` — see `@rules/shared/ports.md` |
-| Use `${VAR:?VAR is not set}` in `run/` scripts | Fail with a clear message when a required env var is missing |
-| All vars in `.env` and `.env.example` | Follow the structure in `@rules/shared/env.md` — never omit a var used in compose |
-
-## Shared infrastructure services
-
-| File | Service | Required env vars |
-|---|---|---|
-| `shared/database.yml` | `database` (PostgreSQL 16) | `DATABASE_NAME`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `DATABASE_PORT` |
-| `shared/cache.yml` | `cache` (Redis 7) | `CACHE_PORT` |
-| `shared/messagebroker.yml` | `messagebroker` (RabbitMQ 3.13) | `MESSAGEBROKER_PORT` |
-| `shared/mailcatcher.yml` | `mailcatcher` | none (ports: 1025 SMTP, 1080 UI) |
-| `shared/monitoring.yml` | `datadog` | `DD_API_KEY`, `DD_SITE` (profile: monitoring) |
-
-## Multi-module projects
-
-See `.commons/make/core/compose.mk` and `.commons/docker/compose/shared/` for the multi-module pattern including `APP_SERVICE`, root `Makefile` delegation, and parallel `run.test`.
-
-## `run/` scripts — container entrypoints
-
-| Script | Called by | Purpose |
-|---|---|---|
-| `run/server` | compose service, `dev` Dockerfile CMD, `make run.server` | Basic server |
-| `run/runtime` | `runtime` Dockerfile CMD | Production entrypoint |
-| `run/install` | compose service, `source` stage, `make run.install` | Install dependencies |
-| `run/test` | compose service, `test` Dockerfile CMD, `make run.test` | Run tests |
-| `run/worker` | `worker`/`backend-worker` service, `make run.worker` | Background worker |
-| `run/migrate` | compose service, `make run.migrate` | Run migrations |
-| `run/seed` | compose service, `make run.seed` | Seed database |
-| `run/lint` | `make run.lint` | Run linter |
-
-`run/server` and `run/runtime` must use `#!/bin/sh` and be self-contained — production has no `.commons/`.
-
-## Image tag == git tag
-
-The release pipeline builds the image with the **same string** used for the git
-tag (`vYYYY.MM.DD-<short-sha>`), plus the moving `latest` tag for convenience.
-Promotion between environments re-tags/pulls that immutable tag — it never
-rebuilds. If a Dockerfile needs the version baked in, read it from a build arg
-fed by the tag, never from `latest`.
-
-## Build args (`modules/<name>/deploy/build-args`)
-
-```bash
-DOCKERFILE=${COMMONS_DIR}/docker/Dockerfile
-STACK=ruby          # ruby | node | elixir | python
-STACK_VERSION=3.4.4
-DISTRO=alpine
-DEPS_PATH=/usr/local/bundle
-LOCK_FILES=Gemfile Gemfile.lock .ruby-version
-```
-
-## `.dockerignore` required entries
-
-```
-.commons
-.lockfiles
-.claude
-.git
-```
-
-## Dockerfile stages
-
-| Stage | FROM | Purpose |
-|---|---|---|
-| `base` | `stack:version-distro` | Shared foundation (runtime + dev) |
-| `builder` | `base` | Build tools |
-| `source` | `builder` | Code + installed deps |
-| `test` | `source` | CI (lint, audit, test) |
-| `dev` | `builder` (or registry) | Local development |
-| `runtime` | `base` | Production |
+- Um `Dockerfile` por módulo, em `modules/<m>/code/`, para a **imagem da release** (stage final de runtime, sem ferramentas de dev). Não há target `dev`.
+- A imagem é construída pelo hook `ci/checks/build.sh`, que recebe `TAG`. O deploy nunca constrói.
+- Sem secrets na imagem; eles chegam em runtime pelo provedor (Secret push).
+- Pin de versões de base alinhado ao `mise.toml` do módulo.
+- O app local roda com `make <m>.start` (script `run/start`), não em container.

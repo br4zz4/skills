@@ -1,23 +1,18 @@
 ---
 name: structure
 description: Use to understand oporpino project structure.
-version: 4.1.0
+version: 5.0.0
 ---
 
 # commons:structure
 
-> **TLDR**: All projects live under `oporpino/`. Each project symlinks `commons` as `.commons` and follows a strict layout: **`modules/<name>/code/`** holds the application and **`modules/<name>/infra/`** holds infrastructure/deploy; **`docs/`** at the repo root holds ALL documentation and **`.project/`** holds only customizations (make, scripts, docker yml). The root `Makefile` orchestrates modules. Run scripts go in the module's `code/run/`. Tasks go in `code/tasks/` (project-specific) or `.commons/shell/tasks/` (shared).
+> **TLDR**: All projects live under `oporpino/`. Each project mounts `br4zz4/commons` as the `.commons` git submodule and follows a strict layout: **`modules/<name>/code/`** holds the application and **`modules/<name>/infra/`** holds infrastructure/deploy; **`docs/`** at the repo root holds ALL documentation and **`.project/`** holds only customizations (make, scripts, docker yml). The root `Makefile` only includes the commons. Local commands go in the module's `code/run/`; project-specific tasks go in `code/tasks/`.
 
 ## Workspace layout
 
 ```
 oporpino/
-├── commons/                   # Shared tooling repo
-│   ├── shell/tasks/           # Shared shell tasks (reused across projects)
-│   ├── make/                  # Shared makefiles (core/, stacks/, shared/)
-│   ├── bin/                   # Shared bins (e.g. bin/db/load, bin/db/drop)
-│   ├── docker/                # Shared docker-compose dev files
-│   └── ai/                    # AI rules and skills
+├── commons/                   # Legacy repo (not used by new projects)
 │
 ├── gateway/                   # Example project (Elixir)
 ├── checkout-api/              # Example project (Ruby)
@@ -29,12 +24,13 @@ oporpino/
 
 ```
 <project>/                                 # root = command surface only
-├── .commons -> /path/to/oporpino/commons  # Symlink — never a git submodule
+├── .commons/                              # git submodule of br4zz4/commons, pinned at v1
+├── commons.ctx                            # project name, environments, vaults
 ├── Makefile                               # Orchestrates modules; includes .project/make/*
 ├── compose.yml                            # Dev compose (thin; see br4zz4:docker)
 ├── .github/                               # CI/CD workflows
 ├── .project/                              # Customizations — NEVER docs
-│   ├── make/                              # Bootstrap + custom make (vars, ARGS, help)
+│   ├── make/                              # Project-only make targets
 │   ├── scripts/                           # One script per repo-level target (1:1)
 │   └── docker/                            # Custom compose yml (overrides, extras)
 ├── docs/                                  # ALL documentation — closed set, see below
@@ -43,12 +39,11 @@ oporpino/
 └── modules/
     └── core/
         ├── code/                          # Application: sources, manifest, Dockerfile
-        │   ├── Makefile                   # App targets (up, run.*, test, logs, ...)
         │   ├── bin/                       # Stack-native binstubs only (rails, rake, ...)
         │   ├── run/                       # oporpino run scripts (server, test, lint, ...)
         │   └── tasks/                     # Project-specific shell tasks
         └── infra/                         # Infrastructure & deploy
-            ├── Makefile                   # Deploy targets (gcp.*, secrets, ...)
+            ├── ops/                       # remote.sh, secrets.sh (commons ops hooks)
             ├── terraform/                 # Terraform workspaces
             ├── k8s/                       # Kustomize base/ + overlays/
             ├── build-args                 # STACK, STACK_VERSION, DISTRO, LOCK_FILES
@@ -62,19 +57,18 @@ Single-module projects always name the module **`core`** (`modules/core/`). Neve
 
 All documentation lives in `docs/` at the **repo root**; its first level is a closed set (`specs/`, `plans/`, `features/`, `learnings/`, `architecture/`, `guides/`, `reference/<scope>/`, `rules/<scope>/` plus `README.md`, `RULES.md`, `modules.md`). Never `.project/docs/`, `modules/<m>/docs/` or a free-form folder at level 1. Layout, routing table and naming: skill `br4zz4:docs`.
 
-## The .commons symlink
+## The .commons submodule
 
-Each project has `.commons` as a **symlink** pointing to the `commons` repo:
+`.commons` is a **git submodule** of `br4zz4/commons`, pinned at the `v1` tag:
 
+```sh
+git submodule add https://github.com/br4zz4/commons .commons
+.commons/bin/init
 ```
-.commons -> /Users/<user>/workspace/oporpino/commons
-```
 
-- Created/refreshed by: `make commons.projects.symlink` (run from commons)
-- Tracked in git as a submodule pointer (SHA), not as a symlink
-- Updated across all projects by: `make commons.projects.commit`
-
-This means `.commons/shell/tasks/` in any project resolves to `commons/shell/tasks/`.
+- Updated with `make commons.update` (fetches tags and checks out `COMMONS_REF` from `commons.ctx`).
+- CI checks it out with `submodules: recursive`.
+- The commons knows no project, language or provider; everything specific lives in `commons.ctx`, `.github/modules.json` and the module scripts.
 
 ## compose.yml
 
@@ -82,26 +76,7 @@ The root `compose.yml` is the dev orchestration surface and stays thin. Its stru
 
 ## Makefile structure
 
-**One `Makefile` per module**; the root `Makefile` only includes them, and a target lives in the module that owns the work. Conventions (module-scoped variables, standalone `ROOT_DIR`, root `help`): skill `br4zz4:make`.
-
-The stack is **auto-detected** by `_contract.mk` based on file presence — no explicit include needed in `Makefile`:
-
-| File present | Stack |
-|---|---|
-| `Gemfile` | Ruby/Rails |
-| `package.json` | React/Node |
-| `mix.exs` | Elixir/Phoenix |
-| `pyproject.toml` / `requirements.txt` | Python/Django |
-
-In this layout the manifests live in `modules/<name>/code/`, so detection paths are
-declared explicitly in `.project/make/overrides.mk` (included automatically by
-`main.makefile`):
-
-```makefile
-# .project/make/overrides.mk
-PROJECT_MANIFEST := modules/core/code/Gemfile
-APP_SERVICE      := app
-```
+The root `Makefile` is `include .commons/make/main.mk` plus `.project/make/*.mk`. There is **no Makefile per module**: the commons generates `<module>.<step>` and `<module>.<run>` targets from `.github/modules.json`. Details: skill `br4zz4:make`.
 
 ## Where scripts live
 
@@ -112,15 +87,14 @@ APP_SERVICE      := app
 | `modules/<name>/code/bin/` | Stack-native binstubs only (`rails`, `rake`, `manage.py`, ...). | none |
 | `modules/<name>/infra/<script>` | Deploy-only scripts (secrets push, release, assets). | `.sh` / none |
 | `.project/scripts/<name>.sh` | Repo-level scripts that back a make target — **1 script ↔ 1 target**. | `.sh` |
-| `.commons/shell/tasks/<domain>/<name>.sh` | Shared tasks reused across multiple projects. | `.sh` |
-| `.commons/bin/<domain>/<name>` | Shared executables reused across multiple projects. | none |
+| `modules/<name>/infra/ops/{remote,secrets}.sh` | Ops hooks run by `make <m>.remote` and `make <m>.secrets`. | `.sh` |
+| `modules/<name>/{code,infra}/ci/checks/<step>.sh` | CI hooks; `make <m>.<step>` runs the same script. | `.sh` |
 
 **Decision rule:**
 - Is it one of the project's standard operations (server, test, lint, migrate, ...)? → `code/run/`
 - Does it use this project's env vars, kubectl context, or docker compose? → `code/tasks/`
 - Does it only run during deploy? → `modules/<name>/infra/`
-- Is it generic enough to work in any project? → `.commons/bin/`
-- Is it already used by another project? → `.commons/shell/tasks/` or `.commons/bin/`
+- Is it generic enough to work in any project? → propose it to `br4zz4/commons`
 - Is it only for this project? → `code/tasks/` or `code/run/`
 
 **Script ↔ target rule:**
@@ -135,8 +109,7 @@ APP_SERVICE      := app
 
 **Never:**
 - Put project-specific logic in `.commons/`
-- Duplicate in `code/tasks/` what already exists in `.commons/shell/tasks/`
-- Reference `.commons/bin/` for tasks that live in `.commons/shell/tasks/`
+- Duplicate in `code/tasks/` what the commons already offers (`make help`)
 
 ## Temporary artifacts and backups — always `./tmp`
 
@@ -202,48 +175,9 @@ modules/<name>/infra/
 Ward vaults stay at the repo root (`.ward/`): they are repo-level secrets, not a
 module artifact.
 
-## Environment vs setup
+## `run/` — local commands
 
-- **environment init** = configura a máquina e todos os projetos (ferramentas globais + clone dos repos)
-  - Script: `environment/init.sh`
-  - Run: fetch the script with `gh api repos/<org>/commons/contents/environment/init.sh --jq .content`, decode it from base64, review it, then run it
-- **project.init** = inicializa este projeto na máquina pela primeira vez (`.commons`, `.env`, asdf)
-  - Script: `.commons/shell/tasks/setup/project/init.sh`
-  - Run: `make project.init`
-- **setup** = reconfigura este projeto (`.env`, asdf)
-  - Script: `.commons/shell/tasks/setup/project.sh`
-  - Run: `make setup`
-
-## Commons shared tasks reference
-
-Key shared tasks available via `.commons/shell/tasks/`:
-
-```
-setup/
-  project.sh            # Setup do projeto (.project, .claude, .codex, .env)
-  env.sh                # Substituição de PROMPT_USER no .env
-commons/
-  setup-symlink.sh      # Create .commons symlinks in all projects
-  projects-commit.sh    # Sync commons SHA across all projects
-  projects-push.sh      # Push main branch across all projects
-release/
-  create.sh             # Create a release
-git/
-  branch-cleanup.sh     # Delete merged branches
-deploy/                 # Deployment tasks
-terraform/              # Terraform secret management
-```
-
-```
-environment/init/
-  tools.sh              # Verifica ferramentas da máquina
-  asdf.sh               # Instala asdf + versões de linguagens
-  oporpino.sh             # Instala oporpino CLI globalmente
-```
-
-## `run/` — container entrypoints
-
-Scripts in `modules/<name>/code/run/` are the module command surface and the compose services' `command`. Contents, shebang rules and the per-script table: skill `br4zz4:docker`.
+Scripts in `modules/<name>/code/run/` are the module's local command surface, one `make <module>.<name>` target each. They run on the host under `mise`, never in a container, and must not use a reserved name (see `br4zz4:make`).
 
 ## Multi-module projects
 
@@ -251,20 +185,17 @@ When the project has more than one module under `modules/`, read `MULTI_MODULE.m
 
 ## Checklist when creating a new project
 
-- [ ] Create `.commons` symlink via `make commons.projects.symlink`
+- [ ] Add the `.commons` submodule and run `.commons/bin/init`
 - [ ] Create `modules/core/code/` with the application + manifest + Dockerfile + `.gitignore`
 - [ ] Create `modules/core/infra/` (terraform/, k8s/, build-args, deploy scripts) if the project deploys
-- [ ] Add `Makefile` at the root that only includes `.project/make/_main.mk` + each module Makefile
-- [ ] Add a `Makefile` per module with its own targets (app targets in `code/`, deploy targets in `infra/`)
-- [ ] Add `.project/make/overrides.mk` with project vars and explicit manifest paths (`modules/core/code/<manifest>`)
+- [ ] Root `Makefile` is just the commons include; fill `commons.ctx` and `.github/modules.json`
+- [ ] Add `mise.toml` and the CI hooks to each side of each module
 - [ ] Add `.env.example` with every variable (`$VAR` references; plausible, non-real values)
-- [ ] Add `compose.yml` at the root following `br4zz4:docker`
-- [ ] Add `.project/docker/compose/services.yml` defining all services
-- [ ] Add `modules/core/code/run/server`, `run/migrate`, etc. for each compose service used
+- [ ] Add `compose.yml` including the commons fragments (see `br4zz4:docker`)
 - [ ] Add the `docs/` directories the project actually needs (closed set — see above)
 - [ ] Put project-specific tasks in `modules/core/code/tasks/<domain>/<name>.sh`
 - [ ] Every `.project/scripts/<name>.sh` has exactly one make target calling it (1:1)
 - [ ] Any target with more than one command is a script, not inline make lines
 - [ ] Point CI workflows at `modules/core/code` (working-directory, build context, dependabot dir)
 - [ ] Keep each module's infra self-declared in `modules/<name>/infra/` (cloud, k8s, terraform)
-- [ ] Never duplicate what's already in `.commons/`
+- [ ] Never duplicate what's already in `.commons/`; run `make conform`
