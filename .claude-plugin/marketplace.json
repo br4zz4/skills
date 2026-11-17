@@ -1,0 +1,13 @@
+{
+  "name": "br4zz4",
+  "owner": {
+    "name": "br4zz4"
+  },
+  "plugins": [
+    {
+      "name": "br4zz4",
+      "source": "./plugins/br4zz4",
+      "description": "br4zz4 agent skills: specs, planning, TDD, review and local workflow helpers."
+    }
+  ]
+}
