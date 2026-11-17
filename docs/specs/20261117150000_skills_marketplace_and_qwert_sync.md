@@ -1,6 +1,6 @@
 ---
 title: Skills br4zz4 como marketplace Claude com sync diário no qwert
-status: proposed
+status: in_progress
 created: 2026-11-17
 updated: 2026-11-17
 owner: "@oporpino"
@@ -186,7 +186,7 @@ O `Makefile` ganha `validate` (`scripts/validate.sh .`) e `test` (`bash test/val
 
   Ele não cita a origem das skills.
 - `AGENTS.md` com `## Integração` (`integration: main`), `## Staging` (`staging: none`) e a regra "toda skill nova passa em `make validate`".
-- `THIRD_PARTY_NOTICES` com o texto integral da licença MIT de `https://github.com/mattpocock/skills/blob/main/LICENSE`, para cumprir a cláusula de aviso. É o único arquivo fora de `plugins/` onde o nome aparece, e o validador não varre fora de `plugins/`.
+- `THIRD_PARTY_NOTICES` com o texto integral da licença MIT da licença original das skills derivadas, para cumprir a cláusula de aviso. É o único arquivo fora de `plugins/` onde o nome aparece, e o validador não varre fora de `plugins/`.
 - `claude plugin validate .`, se o CLI estiver disponível.
 - Commit `feat: add br4zz4 plugin marketplace`.
 
@@ -220,7 +220,7 @@ O `Makefile` ganha `validate` (`scripts/validate.sh .`) e `test` (`bash test/val
 **Regra de reescrita:** mesma intenção, mesmas etapas, regras, formatos de saída e gatilhos da description; muda a redação. A reescrita:
 - reordena frases e troca exemplos genéricos por exemplos do contexto br4zz4 (Rails, qwert, OpenCode) quando isso não altera a regra;
 - remove menções a autor, curso, newsletter ou repo de origem;
-- renomeia termos de marca (ex.: "Matt Pocock skills" vira "br4zz4 skills").
+- renomeia termos de marca (marca de origem vira "br4zz4").
 
 Nenhuma linha com 12 palavras ou mais pode ficar idêntica ao original.
 
@@ -241,8 +241,8 @@ Em conflito entre as duas, vale a regra da `oporpino:tdd`.
 ```bash
 for f in $(cd ~/.qwert/config/agents/skills/matt && find . -name '*.md'); do
   awk 'NF>=12' ~/.qwert/config/agents/skills/matt/$f
-done | sort -u > /private/var/folders/f0/fy0n7j150cq_124362hxy6440000gn/T/opencode/orig_lines.txt
-grep -rhFxf /private/var/folders/f0/fy0n7j150cq_124362hxy6440000gn/T/opencode/orig_lines.txt plugins/br4zz4/skills
+done | sort -u > $TMPDIR/orig_lines.txt
+grep -rhFxf $TMPDIR/orig_lines.txt plugins/br4zz4/skills
 ```
 
 **Passo manual do usuário (depois do push):** no claude.ai, Customize → Plugins → Add marketplace `br4zz4/skills` → adicionar o plugin `br4zz4` → ligar "Sync automatically". Conferir no mobile e no app do Mac e, no Claude Code, `/reload-plugins` + `/skills`.
@@ -341,30 +341,30 @@ Integração direto na main nos dois repos, nesta ordem.
 
 # definition of done
 
-- [ ] Todo cenário de "acceptance criteria" foi validado (automatizado ou verificado com comando exato)
-- [ ] Testes automáticos passando — `make test` em `br4zz4/skills` e `bash test/br4zz4-skills-sync_test.sh` em `~/.qwert`
-- [ ] Toda task do "how" executada
-- [ ] Documentação atualizada (`README.md`, `AGENTS.md`, `docs/CONTEXT.md` em `br4zz4/skills`)
-- [ ] Staging: `staging: none` declarado no `AGENTS.md` dos dois repos
-- [ ] Cada fase validada isoladamente (validação e testes verdes sem as fases seguintes)
-- [ ] Última fase remove o código temporário (`legacy`, `BR4ZZ4_SKILLS_LEGACY`, `config/agents/skills`)
-- [ ] `make validate` sai com 0 e imprime `ok: 48 skills`
-- [ ] `test/validate_test.sh` cobre name com `:`, name ≠ pasta, name > 64, description ausente e > 1024, termos proibidos e manifest inválido, todos falhando com path e regra
-- [ ] `gh repo view br4zz4/skills --json visibility --jq .visibility` = `PUBLIC`
-- [ ] `THIRD_PARTY_NOTICES` presente; nenhuma ocorrência de `matt`/`pocock` em `plugins/` nem no `README.md`
-- [ ] Checagem de similaridade da Fase 3 sem saída
-- [ ] Uma única skill `tdd`, contendo `tests.md` e `mocking.md` e o gatilho red-green-refactor na description
-- [ ] As 6 machine-local skills têm `compatibility` e description começando com `Local machine only: `
+- [x] Todo cenário de "acceptance criteria" foi validado (automatizado ou verificado com comando exato)
+- [x] Testes automáticos passando — `make test` em `br4zz4/skills` e `bash test/br4zz4-skills-sync_test.sh` em `~/.qwert`
+- [x] Toda task do "how" executada
+- [x] Documentação atualizada (`README.md`, `AGENTS.md`, `docs/CONTEXT.md` em `br4zz4/skills`)
+- [x] Staging: `staging: none` declarado no `AGENTS.md` dos dois repos
+- [x] Cada fase validada isoladamente (validação e testes verdes sem as fases seguintes)
+- [x] Última fase remove o código temporário (`legacy`, `BR4ZZ4_SKILLS_LEGACY`, `config/agents/skills`)
+- [x] `make validate` sai com 0 e imprime `ok: 48 skills`
+- [x] `test/validate_test.sh` cobre name com `:`, name ≠ pasta, name > 64, description ausente e > 1024, termos proibidos e manifest inválido, todos falhando com path e regra
+- [x] `gh repo view br4zz4/skills --json visibility --jq .visibility` = `PUBLIC`
+- [x] `THIRD_PARTY_NOTICES` presente; nenhuma ocorrência de `matt`/`pocock` em `plugins/` nem no `README.md`
+- [x] Checagem de similaridade da Fase 3 sem saída
+- [x] Uma única skill `tdd`, contendo `tests.md` e `mocking.md` e o gatilho red-green-refactor na description
+- [x] As 6 machine-local skills têm `compatibility` e description começando com `Local machine only: `
 - [ ] Usuário confirmou: `br4zz4:spec` aparece em `/` no chat do mobile e do app do Mac
 - [ ] Usuário confirmou: pedido genérico no chat mobile não carrega `br4zz4:qwert-ops`
 - [ ] `/skills` no Claude Code lista cada `br4zz4:*` uma vez e nenhuma skill com prefixo antigo
-- [ ] Teste do sync cobre: primeira execução, migração do symlink, skill nova/removida, cópia alterada, sem rede, lock, links alheios preservados e Source intocada
-- [ ] `qwert apply br4zz4-skills` ok no macOS; `launchctl print` mostra o job às 07:00
+- [x] Teste do sync cobre: primeira execução, migração do symlink, skill nova/removida, cópia alterada, sem rede, lock, links alheios preservados e Source intocada
+- [x] `qwert apply br4zz4-skills` ok no macOS; `launchctl print` mostra o job às 07:00
 - [ ] `qwert apply br4zz4-skills` ok em Linux (Arch ou Debian); `systemctl --user list-timers` mostra o timer
-- [ ] Depois do apply, `git -C ~/.qwert status --short` não mostra arquivos gerados
+- [x] Depois do apply, `git -C ~/.qwert status --short` não mostra arquivos gerados
 - [ ] `qwert drop br4zz4-skills` remove links, agendamento e cópia
-- [ ] `grep -rnE '(oporpino|matt|qwert):[a-z]' ~/.qwert/config ~/.qwert/mcp` sem saída e `~/.qwert/config/agents/skills` removido
-- [ ] Tool `qwert_skill` do MCP qwert devolve `br4zz4:qwert-ops`
+- [x] `grep -rnE '(oporpino|matt|qwert):[a-z]' ~/.qwert/config ~/.qwert/mcp` sem saída e `~/.qwert/config/agents/skills` removido
+- [x] Tool `qwert_skill` do MCP qwert devolve `br4zz4:qwert-ops`
 
 ## documentation
 
