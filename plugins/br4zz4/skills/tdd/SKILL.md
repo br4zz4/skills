@@ -129,7 +129,7 @@ If the shape of the interface itself is uncertain (module depth, seam placement,
 ## Rules of the loop
 
 - **Red before green.** Failing test first, then only enough code to pass it. No speculative features.
-- **One slice at a time.** One seam, one test, one minimal implementation per cycle.
+- **A single slice per cycle.** Each pass covers one seam, one test and the smallest implementation that satisfies it.
 - **Refactor after green**, with the suite passing; behavior never changes during refactor.
 
 ---
