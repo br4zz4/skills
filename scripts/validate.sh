@@ -66,7 +66,7 @@ market="$root/.claude-plugin/marketplace.json"
 if [ ! -f "$market" ]; then
   fail "$market: file is missing"
 else
-  jq -e '.name and .plugins' "$market" >/dev/null 2>&1 \
+  jq -e '.name and ((.plugins | length) > 0)' "$market" >/dev/null 2>&1 \
     || fail "$market: invalid JSON or missing required fields (name, plugins)"
 fi
 

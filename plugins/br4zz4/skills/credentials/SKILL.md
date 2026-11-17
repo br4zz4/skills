@@ -56,7 +56,7 @@ ward como fonte única.
 ```
 has_warranty:secrets.core.code.staging.SECRET_KEY_BASE
 has_warranty:secrets.core.code.production.NEON_DATABASE_URL
-trgclub:secrets.core.infra.staging.TF_VAR_api_url
+myapp:secrets.core.infra.staging.TF_VAR_api_url
 commons:secrets.core.infra.staging.eks_access_key    # shared vault, same depth → unions
 ```
 
@@ -71,7 +71,7 @@ Directory layout inside a vault mirrors the path — one encrypted file per grou
 ```
 
 Do not invent other levels (`app`, `shared`, bare env). `bootstrap` remains a
-special vault for project keys (`bootstrap:trgclub-api.master_key`) — not env-scoped.
+special vault for project keys (`bootstrap:myapp-api.master_key`) — not env-scoped.
 
 ## Scope convention
 
@@ -80,9 +80,9 @@ vaults, unioned) or `vault:secret-path` (one vault).
 
 ```
 secrets.core.code.staging                     # every vault's secrets.core.code.staging, unioned
-trgclub:secrets.core.infra.staging.TF_VAR_api_url  # vault=trgclub, secret-path=secrets.core.infra.staging.TF_VAR_api_url
+myapp:secrets.core.infra.staging.TF_VAR_api_url  # vault=myapp, secret-path=secrets.core.infra.staging.TF_VAR_api_url
 commons:secrets.core.infra.staging.eks_access_key # vault=commons,  secret-path=secrets.core.infra.staging.eks_access_key
-bootstrap:trgclub-api.master_key        # vault=bootstrap, secret-path=trgclub-api.master_key
+bootstrap:myapp-api.master_key        # vault=bootstrap, secret-path=myapp-api.master_key
 ```
 
 - **Unqualified** (`secret-path` only) — **the default form**. Overlays the same
@@ -90,8 +90,8 @@ bootstrap:trgclub-api.master_key        # vault=bootstrap, secret-path=trgclub-a
   the shared `commons` values. Valid for `exec`/`secrets`/`tree`; ambiguous for `get`.
 - **Qualified** (`vault:secret-path`) — targets one vault. Use it for the specific
   cases: reading a single value with `get`, or deliberately reaching into one vault
-  (e.g. `bootstrap:trgclub-api.master_key`).
-- A plain dot-separated string (`trgclub.secrets.core.infra.staging.AWS_KEY`) is a **bare secret-path**, NOT a vault selector. Use `:` to qualify the vault.
+  (e.g. `bootstrap:myapp-api.master_key`).
+- A plain dot-separated string (`myapp.secrets.core.infra.staging.AWS_KEY`) is a **bare secret-path**, NOT a vault selector. Use `:` to qualify the vault.
 
 ### Ancestors are NOT inherited (ward 0.2.x)
 
@@ -101,8 +101,8 @@ file ancestry:
 
 ```
 commons.secrets.core.infra.staging.TF_VAR_cloudflare_api_token   # shared vault
-trgclub.secrets.core.infra.staging.TF_VAR_rails_master_key
-trgclub.secrets.core.infra.production.TF_VAR_api_url
+myapp.secrets.core.infra.staging.TF_VAR_rails_master_key
+myapp.secrets.core.infra.production.TF_VAR_api_url
 
 ward secrets secrets.core.infra.staging   →  ONLY the staging values
                                          the production value is not included
@@ -118,7 +118,7 @@ Two consequences when laying out a vault:
   `<app>.secrets.<module>.infra.<env>.X`).
 
 Do not model "shared at the parent, overrides one level deeper" — it does not
-resolve. Tracked upstream in oporpino/ward#19.
+resolve.
 
 Colliding names are a **hard error** with no precedence: ward refuses to pick a
 winner, and scope order does not break the tie. Duplicating a `commons` value into
@@ -169,26 +169,26 @@ ward_exec        → execute a command with ward secrets injected as env vars
 
 ```
 # See everything in a project vault
-ward_tree { "dir": "/path/to/trgclub" }
+ward_tree { "dir": "/path/to/myapp" }
 
-# Read a runtime secret  (scope: trgclub:secrets.core.code.staging.SECRET_KEY_BASE)
-ward_get { "path": "trgclub:secrets.core.code.staging.SECRET_KEY_BASE", "dir": "/path/to/trgclub" }
+# Read a runtime secret  (scope: myapp:secrets.core.code.staging.SECRET_KEY_BASE)
+ward_get { "path": "myapp:secrets.core.code.staging.SECRET_KEY_BASE", "dir": "/path/to/myapp" }
 
-# Read an infra secret  (scope: trgclub:secrets.core.infra.staging.TF_VAR_api_url)
-ward_get { "path": "trgclub:secrets.core.infra.staging.TF_VAR_api_url", "dir": "/path/to/trgclub" }
+# Read an infra secret  (scope: myapp:secrets.core.infra.staging.TF_VAR_api_url)
+ward_get { "path": "myapp:secrets.core.infra.staging.TF_VAR_api_url", "dir": "/path/to/myapp" }
 
-# Read from commons vault mounted by trgclub  (scope: commons:secrets.core.infra.staging.eks_access_key)
-ward_get { "path": "commons:secrets.core.infra.staging.eks_access_key", "dir": "/path/to/trgclub" }
+# Read from commons vault mounted by myapp  (scope: commons:secrets.core.infra.staging.eks_access_key)
+ward_get { "path": "commons:secrets.core.infra.staging.eks_access_key", "dir": "/path/to/myapp" }
 
 # Set a value
-ward_set { "path": "trgclub:secrets.core.infra.staging.TF_VAR_api_url", "value": "https://...", "dir": "/path/to/trgclub" }
+ward_set { "path": "myapp:secrets.core.infra.staging.TF_VAR_api_url", "value": "https://...", "dir": "/path/to/myapp" }
 
 # Run a command with secrets injected for one env
-ward_exec { "command": "terraform apply", "dir": "/path/to/trgclub" }
+ward_exec { "command": "terraform apply", "dir": "/path/to/myapp" }
 
 # Inspect bootstrap (single source of truth for all project keys)
 ward_tree { "dir": "/path/to/bootstrap" }
-ward_get  { "path": "bootstrap:trgclub-api.master_key", "dir": "/path/to/bootstrap" }
+ward_get  { "path": "bootstrap:myapp-api.master_key", "dir": "/path/to/bootstrap" }
 ```
 
 ## Rails credentials

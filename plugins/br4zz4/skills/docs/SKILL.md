@@ -13,7 +13,7 @@ version: 3.0.0
 Antes de escrever qualquer doc, leia os docs existentes para entender convenções e evitar duplicação:
 
 - **Docs do projeto**: `docs/` na raiz do repo atual
-- **Docs do commons**: `docs/` no repo commons (`ibft-corp/commons`) — guides, architecture e patterns que valem para todos os projetos oporpino
+- **Docs do commons**: `docs/` no repo commons (`<org>/commons`) — guides, architecture e patterns que valem para todos os projetos oporpino
 
 ---
 

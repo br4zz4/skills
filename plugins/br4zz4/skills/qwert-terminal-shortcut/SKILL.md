@@ -146,7 +146,7 @@ bindkey | grep <sequence>
 ```
 python3 -c "
 import plistlib
-with open('/Users/gporpino/.qwert/config/iterm2/com.googlecode.iterm2.plist', 'rb') as f:
+with open(os.path.expanduser('~/.qwert/config/iterm2/com.googlecode.iterm2.plist'), 'rb') as f:
     data = plistlib.load(f)
 gkm = data.get('GlobalKeyMap', {})
 for k, v in sorted(gkm.items()):
@@ -182,7 +182,7 @@ To add/remove entries:
 ```python
 import plistlib
 
-path = '/Users/gporpino/.qwert/config/iterm2/com.googlecode.iterm2.plist'
+path = os.path.expanduser('~/.qwert/config/iterm2/com.googlecode.iterm2.plist')
 with open(path, 'rb') as f:
     data = plistlib.load(f)
 

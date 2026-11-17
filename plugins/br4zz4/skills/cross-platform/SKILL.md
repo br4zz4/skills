@@ -21,7 +21,7 @@ Contexto: este repo (qwert) sincroniza configs/skills/hooks entre máquinas **ma
    - `date`, `stat`, `grep -P`, `readlink -f` divergem — GNU vs BSD. Prefira alternativas portáveis (`realpath`, `grep -E`).
    - `killall`/`systemctl` não existem/lembram no macOS: `systemctl` só Linux; recarregue Hyprland com `hyprctl reload`.
 4. **Hooks e zsh:** shell é `zsh` nas duas, mas hooks em `~/.qwert/hooks/zsh/{prepare,init}/` são escopados por diretório (`shared/`, `personal/`, `work/`, ...). Qualquer hook novo que interesse aos dois perfis vai em `shared/`.
-5. **Keybinds / desktop:** remaps de teclado têm dois destinos — `keyd` (`/etc/keyd`, Linux) e macOS (Karabiner/HID) erklärt no skill `mac-hyprland`. Quando mudar um atalho, espelhar no outro lado (ou registrar que NÃO se aplica ao outro OS, com justificativa).
+5. **Keybinds / desktop:** remaps de teclado têm dois destinos — `keyd` (`/etc/keyd`, Linux) e macOS (Karabiner/HID) documentado na skill do desktop da máquina. Quando mudar um atalho, espelhar no outro lado (ou registrar que NÃO se aplica ao outro OS, com justificativa).
 6. **Teste mental dos dois lados antes de commitar:** pergunte-se "isso roda no Arch?" e "isso roda no Mac?". Se não roda em algum, guard com detecção de plataforma — não com comentário "só funciona no X".
 
 ## Checklist antes do commit
