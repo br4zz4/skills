@@ -145,14 +145,14 @@ Every logical branch has a test:
 
 ## Who does what
 
-Tests belong to the **tester**; production code belongs to the **techleader** and **builder**. Nobody else edits tests (enforced by permissions).
+Tests belong to the **tester**; production code belongs to the **builder** and **intern**. Nobody else edits tests (enforced by permissions).
 
 | Phase | Owner |
 |-------|-------|
 | RED — write the failing tests from the Gherkin `## acceptance criteria`, without reading the new implementation | tester |
-| GREEN — minimal implementation | techleader / builder |
+| GREEN — minimal implementation | builder / intern |
 | Verify GREEN — full suite, 2× in a row | tester |
-| REFACTOR — production code only; tests stay green | techleader / builder |
+| REFACTOR — production code only; tests stay green | builder / intern |
 
 Need a new or changed test during implementation → ask the tester; never edit it yourself.
 

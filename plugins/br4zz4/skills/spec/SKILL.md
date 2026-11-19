@@ -288,7 +288,7 @@ to do it — suggest it, with the exact steps below. The worktree lives inside t
 3. **Move the session:** after creating it, move the current session to the worktree directory
    (`session_move`) so the implementation runs there.
 
-Then hand off to the **techleader** and implement **directly from the spec** — there is no separate
+Then hand off to the **builder** and implement **directly from the spec** — there is no separate
 plan step. Give the user the ready-to-paste line (the `/goal` is a user command; the agent cannot
 fire it):
 
@@ -296,7 +296,7 @@ fire it):
 /goal Implementar docs/specs/<arquivo>.md até o definition of done completo
 ```
 
-The spec's final "definition of done" is the implementation contract: the techleader works through
+The spec's final "definition of done" is the implementation contract: the builder works through
 it item by item, the tester writes the red tests from the Gherkin and runs the green suite
 (`br4zz4:tdd`), and each item is ticked as it is verified.
 
