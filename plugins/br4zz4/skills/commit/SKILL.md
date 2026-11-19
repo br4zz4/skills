@@ -1,10 +1,20 @@
 ---
 name: commit
-description: Use when the user asks to commit changes.
-version: 1.0.0
+description: Use when the user asks to commit changes, or says "comush" (commit + push, leaving nothing behind).
+version: 1.1.0
 ---
 
 # commons:commit
+
+## comush
+
+`comush` = **commit + push, leaving nothing behind**. When the user says it, run this skill's commit flow and push in the same turn:
+
+1. Every modified, deleted and untracked file is either committed (grouped by context) or added to `.gitignore`. Unsure files: ask, never skip silently
+2. Cover every repo touched in the session (e.g. a skills clone and the dotfiles repo), not only the current directory
+3. `git pull --rebase` before pushing; on conflict, resolve preserving both intents or stop and ask
+4. Push each repo, then confirm `git status -sb` shows clean and neither ahead nor behind
+5. Report per repo: last commit and push result. A repo left dirty or ahead is a failure to report, not to hide
 
 ## Mandatory rules
 
