@@ -1,7 +1,7 @@
 ---
 name: architecture
 description: Use when designing or writing application/backend code organized in ports/core/bridges/platform (use cases, events, outbox). Not for scripts, dotfiles or config.
-version: 1.0.0
+version: 1.1.0
 ---
 
 # br4zz4:architecture
@@ -49,13 +49,13 @@ Fixed depth, always: `port → entry point → step`. Three arrows.
 
 ### The core's I/O contract
 
-A use case has exactly three outputs, and no other:
+A use case (`Lucid::Case::Command` when it writes, `Lucid::Case::Query` when it only reads) has exactly three outputs, and no other:
 
-1. **Result** — the synchronous answer, returned through the port that called it
+1. **Result** — the synchronous answer (`success(...)` / `failure(:type, ...)`), returned through the port that called it
 2. **Bridge call** — an addressed request to one known outside system, mid-flow
-3. **Event** — an anonymous fact recorded in the database; the core does not know who reacts
+3. **Event** — an anonymous fact recorded in the database (inside the Command's transaction); the core does not know who reacts
 
-Choosing between 2 and 3: if the use case needs the answer to continue, call a bridge; if not, record an event.
+Choosing between 2 and 3: if the use case needs the answer to continue, call a bridge; if not, record an event. Effects that must follow the commit (jobs, mail, notifications) go in the Command's `after_commit`, never in the body.
 
 ```text
 # BAD — hidden chain: each step calls the next, nobody sees the flow

@@ -1,12 +1,12 @@
 ---
 name: rails
 description: Use when writing or reviewing Rails code.
-version: 1.4.0
+version: 1.5.0
 ---
 
 # commons:rails
 
-> **TLDR**: Arrow Architecture in Rails — `core/ports/bridges/platform` folders, u-case actions named as the business speaks, explicit orchestration (no `flow`), async effects via transactional outbox.
+> **TLDR**: Arrow Architecture in Rails — `core/ports/bridges/platform` folders, lucid-case use cases named as the business speaks, explicit orchestration (no `flow`), async effects via transactional outbox, Solid Cache and Solid Queue on Postgres.
 
 Principles and laws live in `br4zz4:architecture`. This skill is the Rails application of them.
 
@@ -14,8 +14,9 @@ Principles and laws live in `br4zz4:architecture`. This skill is the Rails appli
 
 ```ruby
 # Gemfile
-gem "u-case", "~> 4.5", require: "u-case/with_activemodel_validation"
-gem "good_job"
+gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.1.0"
+gem "solid_queue"
+gem "solid_cache"
 # with RabbitMQ: gem "bunny" (publish) + gem "sneakers" (consume)
 ```
 
@@ -36,10 +37,26 @@ end
   config.eager_load_paths << path
 end
 
-config.good_job.enable_cron = true
-config.good_job.cron = {
-  event_relay: { cron: "* * * * *", class: "EventRelayJob" }
-}
+config.active_job.queue_adapter = :solid_queue
+config.cache_store = :solid_cache_store
+```
+
+```yaml
+# config/recurring.yml — Solid Queue recurring tasks
+production:
+  event_relay:
+    class: EventRelayJob
+    schedule: every minute
+```
+
+Cache and queue live in Postgres (own databases/schemas), never Redis. A project on a specific platform (e.g. Cloud Tasks) records the exception in an ADR.
+
+```ruby
+# config/initializers/lucid_case.rb — Query cache uses Rails.cache (Solid Cache);
+# multi-tenant apps must scope the cache key by tenant
+Lucid::Case.configure do |config|
+  config.cache_scope = -> { Current.organization&.id }
+end
 ```
 
 ## Folder layout
@@ -101,9 +118,9 @@ class CheckoutsController < ApplicationController
     result = Cart::Checkout.call(cart: current_cart, payment_method: params[:payment_method])
 
     if result.success?
-      render json: OrderSerializer.new(result.data[:order]), status: :created
+      render json: OrderSerializer.new(result[:order]), status: :created
     else
-      render json: { errors: result.data[:errors] }, status: :unprocessable_entity
+      render json: { errors: result[:errors] }, status: :unprocessable_entity
     end
   end
 end
@@ -129,13 +146,13 @@ end
 
 ## Core
 
-One use case = one class = one action someone performs, named noun + verb: `Cart::Add`, `Cart::Checkout`, `Auth::Login`. Never `CartService`, `CartManager`, `process(action:)`.
+One use case = one class (`Lucid::Case::Command` when it writes, `Lucid::Case::Query` when it only reads) = one action someone performs, named noun + verb: `Cart::Add`, `Cart::Checkout`, `Auth::Login`. Never `CartService`, `CartManager`, `process(action:)`.
 
 `flow` is banned — it hides where errors come from. Orchestration is explicit guard clauses:
 
 ```ruby
 # app/core/use_cases/cart/checkout.rb — ENTRY POINT: only composes, may cross nouns
-class Cart::Checkout < Micro::Case
+class Cart::Checkout < Lucid::Case::Command
   attributes :cart, :payment_method
 
   def call!
@@ -145,16 +162,15 @@ class Cart::Checkout < Micro::Case
     charge = Payment::Charge.call(cart: cart, payment_method: payment_method)
     return charge if charge.failure?
 
-    order = nil
-    transaction do
-      order = Order.create!(cart: cart, charge_id: charge.data[:charge_id])
-      Event.create!(name: "order.placed", payload: { order_id: order.id })
-    end
+    order = Order.create!(cart: cart, charge_id: charge[:charge_id])
+    Event.create!(name: "order.placed", payload: { order_id: order.id })
 
-    Success result: { order: order }
+    success(order: order)
   end
 end
 ```
+
+A `Command` runs in a transaction by default: the order and the event commit together, and a `failure` or exception rolls both back. Use `transaction :disabled` for external I/O, independent batches, or when the case must persist its own failure.
 
 Steps do one thing and never call another use case. Flow-private steps nest under the action (`Cart::Checkout::ValidateStock`); reusable verbs live at noun level (`Payment::Charge`). Entry points never call entry points — flatten, or the second flow is a reaction → event.
 
@@ -238,7 +254,7 @@ class User < ApplicationRecord
 end
 
 # Use case — context: coupon code is required only when applying a coupon
-class Cart::ApplyCoupon < Micro::Case
+class Cart::ApplyCoupon < Lucid::Case::Command
   attributes :cart, :coupon_code
 
   validates :coupon_code, presence: true
@@ -251,22 +267,22 @@ end
 
 ## Bridges
 
-Wrap every outside party; also `Micro::Case` (uniform contract). Translate their vocabulary into ours; capture infra errors into `Failure`; never decide business.
+Wrap every outside party; also a lucid-case use case (uniform contract) — `Query` when it only reads, `Command` with `transaction :disabled` when it writes outside. Translate their vocabulary into ours; capture infra errors into `failure`; never decide business.
 
 ```ruby
 # app/bridges/hotmart/payment_status.rb
-class Hotmart::PaymentStatus < Micro::Case
+class Hotmart::PaymentStatus < Lucid::Case::Query
   attributes :email
 
   validates :email, presence: true
 
   def call!
     user = fetch_user
-    return Failure result: { error: "user not found" } if user.nil?
+    return failure(:user_not_found, error: "user not found") if user.nil?
 
-    Success result: { overdue: user["status"] == "BLOCKED" }   # our vocabulary out
+    success(overdue: user["status"] == "BLOCKED")   # our vocabulary out
   rescue Faraday::Error => e
-    Failure result: { error: e.message }
+    failure(:unavailable, error: e.message)
   end
 end
 ```
@@ -338,7 +354,7 @@ class EventHandlerJob < ApplicationJob
 
   def perform(use_case_name, event_id)
     result = use_case_name.constantize.call(event: Event.find(event_id))
-    raise result.data[:error].to_s if result.failure?
+    raise result[:error].to_s if result.failure?
   end
 end
 ```
@@ -357,17 +373,19 @@ end
 
 ```ruby
 # app/bridges/rabbit/publish.rb — broker protocol lives in a bridge
-class Rabbit::Publish < Micro::Case
-  attribute :event
+class Rabbit::Publish < Lucid::Case::Command
+  transaction :disabled
+
+  attributes :event
 
   def call!
     exchange.publish(
       { event_id: event.id, name: event.name, payload: event.payload }.to_json,
       routing_key: event.name, persistent: true
     )
-    Success result: { published: event.name }
+    success(published: event.name)
   rescue Bunny::Exception => e
-    Failure result: { error: e.message }
+    failure(:publish_failed, error: e.message)
   end
 
   private
@@ -382,11 +400,11 @@ Delivery is at-least-once on every transport — idempotency lives in the reacti
 
 ```ruby
 # app/core/use_cases/order/send_confirmation.rb
-class Order::SendConfirmation < Micro::Case
-  attribute :event
+class Order::SendConfirmation < Lucid::Case::Command
+  attributes :event
 
   def call!
-    return Success(:already_processed) if event.processed_at.present?
+    return success(already_processed: true) if event.processed_at.present?
 
     order = Order.find(event.payload["order_id"])
 
@@ -394,12 +412,12 @@ class Order::SendConfirmation < Micro::Case
     return delivery if delivery.failure?
 
     event.update!(processed_at: Time.current)
-    Success result: { order: order }
+    success(order: order)
   end
 end
 ```
 
-`constantize` receives only `Subscriptions` strings, never external input. GoodJob enqueues are transactional (Postgres) — do not use that to skip the Event table: you lose the fact record, the subscriptions map and the broker route.
+`constantize` receives only `Subscriptions` strings, never external input. Solid Queue enqueues are transactional (Postgres), and side effects of a `Command` (jobs, mail, notifications) go in its `after_commit` so they never fire for a rolled-back write — do not use either to skip the Event table: you lose the fact record, the subscriptions map and the broker route.
 
 ## Webhooks
 
@@ -411,52 +429,52 @@ class Webhooks::HotmartController < ApplicationController
   def create
     result = Webhook::Receive.call(headers: signature_headers, payload: request.raw_post)
 
-    result.failure?(:invalid_signature) ? head(:unauthorized) : head(:ok)
+    result.type == :invalid_signature ? head(:unauthorized) : head(:ok)
   end
 end
 ```
 
 ```ruby
 # app/core/use_cases/webhook/receive.rb — entry point: verify, translate, record the fact, answer fast
-class Webhook::Receive < Micro::Case
+class Webhook::Receive < Lucid::Case::Command
   attributes :headers, :payload
 
   def call!
     signature = Hotmart::VerifySignature.call(headers: headers, payload: payload)
-    return Failure(:invalid_signature) if signature.failure?
+    return failure(:invalid_signature) if signature.failure?
 
     parsed = Hotmart::ParseWebhook.call(payload: payload)
-    return Success(:ignored) if parsed.failure?
+    return success(ignored: true) if parsed.failure?
 
     Event.create!(
-      name: parsed.data[:name],
-      payload: parsed.data[:payload],
-      external_id: parsed.data[:external_id]
+      name: parsed[:name],
+      payload: parsed[:payload],
+      external_id: parsed[:external_id]
     )
-    Success result: { received: true }
+    success(received: true)
   rescue ActiveRecord::RecordNotUnique
-    Success(:duplicate)
+    success(duplicate: true)
   end
 end
 ```
 
 ```ruby
 # app/bridges/hotmart/parse_webhook.rb — all vendor dialect lives here
-class Hotmart::ParseWebhook < Micro::Case
+class Hotmart::ParseWebhook < Lucid::Case::Query
   EVENTS = { "PURCHASE_REFUNDED" => "payment.refunded" }.freeze
 
-  attribute :payload
+  attributes :payload
 
   def call!
     data = JSON.parse(payload)
     name = EVENTS[data["event"]]
-    return Failure(:unknown_event) if name.nil?
+    return failure(:unknown_event) if name.nil?
 
-    Success result: {
+    success(
       name: name,
       external_id: data["id"],
       payload: { email: data.dig("data", "buyer", "email") }
-    }
+    )
   end
 end
 ```
@@ -605,4 +623,4 @@ O script `console.sh` injeta `DATABASE_URL` e `CONSOLE_SANDBOX` automaticamente 
 - Any core file mentioning HTTP, params, or vendor names?
 - Any use case crossing nouns without being the entry point?
 - Every async effect an `Event`?
-- Every outside call wrapped in a bridge returning `Success/Failure`?
+- Every outside call wrapped in a bridge returning `success/failure`?
