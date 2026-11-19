@@ -512,6 +512,30 @@ Never give an env var a default in code: use `ENV.fetch("VAR")` (raises if missi
 # overlays/production/patches/deployment.yaml: RAILS_ENV=production (explicit)
 ```
 
+### Environments on Cloud Run + commons (staging in Rails)
+
+A project that deploys `staging` and `production` from the same image still needs a real `staging` Rails environment, so `ENV=staging` locally and the remote console match the deployed one.
+
+- `config/environments/staging.rb`: `require_relative "production"` plus `config.log_level = ENV.fetch("RAILS_LOG_LEVEL")` (debug in staging). Never copy `production.rb`.
+- Add `staging:` wherever `production:` is keyed: `database.yml` (`staging: <<: *production`, so `production: &production` needs the anchor), `cable.yml` (own `channel_prefix`), and every `Rails.env.production?` / `ENV["RAILS_ENV"] == "production"` check (Puma workers, PDF binary path), otherwise staging silently runs the dev branch.
+- `br4zz4/commons` exports only `ENVIRONMENT`, never `RAILS_ENV`. Every `run/*` that boots Rails sources `lib/rails_env.sh`, which maps `ENVIRONMENT` to `RAILS_ENV` (`development`, `test`, `staging`, `production`; anything else exits 64). Without it `make core.console ENV=staging` opens a dev console on the local database.
+- Destructive scripts (`db.create`, `db.drop`, `db.reset`, `db.rollback`, `db.prepare`) source `lib/local_env.sh`, which calls `rails_env.sh` and refuses anything but development and test. `console`, `routes`, `db.migrate*` and `db.seed` may target staging and production; the commons asks for the project name on restricted environments.
+- The console prompt shows the env (`(prod)`, `(staging)`): check it before pasting data-changing code.
+
+### Tenant per subdomain on Cloud Run
+
+One Cloud Run service serves every tenant; the tenant is the host, the schema is per tenant. Cloud Run has no wildcard domain mapping, so each new tenant needs its own CNAME and domain mapping (plus a managed certificate, a few minutes).
+
+- The tenant base domain is a plain env var, `TENANT_BASE_DOMAIN` (`staging.example.com` in staging, `example.com` in production), set in Terraform `base_env_vars` from the environment host. It is not a secret and does not go in ward. The resolver strips it from the host to get the subdomain; a host outside the base falls back to `tld_length`.
+- Provisioning is a use case plus a Cloud Tasks job, not an `after_create` callback: persist a `SubdomainProvisioning` row (`pending`, `running`, `succeeded`, `failed`, `current_step`, `attempts`, `last_error`), enqueue the job, run idempotent steps (Cloudflare CNAME to `ghs.googlehosted.com`, `proxied: false`; Cloud Run `domainmappings`, 409 means already there). The worker answers 503 on failure so the queue retries with backoff; the admin monitor lists rows and retries `failed` ones.
+- Reserve subdomains (`www`, `admin`, `avo`, `api`, `app`, `staging`, `production`) and validate a single DNS label on create.
+- Cloudflare needs `Zone:Read` and `DNS:Edit` on the zone; the runtime service account needs `roles/run.admin`, and the domain must be verified for it in Search Console.
+- A host that resolves to the wrong tenant shows the school's 404: check the `organizations` table of that environment first, then the logs of `TenantMiddleware`. The log line prints `request.subdomain`, not the value the resolver used.
+
+### Neon: backup is history, not a copy
+
+Neon restores a root branch to any second inside the history window (Free 6 h, Launch up to 7 days, Scale up to 30 days) and keeps snapshots (scheduled ones up to 35 days). Everything lives inside the Neon project, so it is recovery, not an off-site backup, and it does not protect against a bad migration found after the window. For production: a paid plan with the window at 7 days or more, a daily scheduled snapshot, a manual snapshot before risky migrations, and a daily `pg_dump` to a bucket outside Neon (Cloud Scheduler plus Cloud Run Job). Rehearse one restore.
+
 ## Credentials
 
 Only production has its own credentials file. Staging uses the default credentials.

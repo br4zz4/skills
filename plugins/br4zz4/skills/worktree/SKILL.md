@@ -73,6 +73,8 @@ git merge <projeto>/.worktrees/<nome>  # ou a branch
 
 O merge pode ser fast-forward (commits direto) — confere com `git status -sb`.
 
+**Stash:** só dê `git stash pop` num stash que você mesmo criou na mesma operação. `git stash` sem mudanças não cria nada, e o `pop` seguinte restaura um stash antigo do usuário, com conflitos. Rode `git stash list` antes e, se o pop conflitar, desfaça com `git reset --hard HEAD` (o stash é mantido) e avise o usuário.
+
 ## Verificação
 
 - [ ] worktree está em `<projeto>/.worktrees/` ou `~/.worktrees/`
