@@ -51,6 +51,8 @@ production:
 
 Cache and queue live in Postgres (own databases/schemas), never Redis. A project on a specific platform (e.g. Cloud Tasks) records the exception in an ADR.
 
+Environment variables name what a thing is, never the implementation behind it: `DATABASE_URL`, `CACHE_URL`, `QUEUE_URL`, `CABLE_URL`, not `REDIS_URL`. Production and staging turn the cache on only when `CACHE_URL` is set and fall back to a null store otherwise, so a deploy never breaks for a missing cache database. Declare the cache database in `database.yml` only when `CACHE_URL` is present, and set `config.cache_store` in `config/environments/*.rb` (an initializer runs after `Rails.cache` is built).
+
 ```ruby
 # config/initializers/lucid_case.rb — Query cache uses Rails.cache (Solid Cache);
 # multi-tenant apps must scope the cache key by tenant
