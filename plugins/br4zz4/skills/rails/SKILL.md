@@ -49,9 +49,9 @@ production:
     schedule: every minute
 ```
 
-Cache and queue live in Postgres (own databases/schemas), never Redis. A project on a specific platform (e.g. Cloud Tasks) records the exception in an ADR.
+Cache (`solid_cache`), queue (`solid_queue`) and ActionCable (`solid_cable`) live in Postgres (own databases), never Redis. A project on a specific platform (e.g. Cloud Tasks) records the exception in an ADR.
 
-Environment variables name what a thing is, never the implementation behind it: `DATABASE_URL`, `CACHE_URL`, `QUEUE_URL`, `CABLE_URL`, not `REDIS_URL`. Production and staging turn the cache on only when `CACHE_URL` is set and fall back to a null store otherwise, so a deploy never breaks for a missing cache database. Declare the cache database in `database.yml` only when `CACHE_URL` is present, and set `config.cache_store` in `config/environments/*.rb` (an initializer runs after `Rails.cache` is built).
+Environment variables name what a thing is, never the implementation behind it: `DATABASE_URL`, `CACHE_URL`, `QUEUE_URL`, `CABLE_URL`, not `REDIS_URL`. Production and staging turn the cache on only when `CACHE_URL` is set (null store otherwise) and use Solid Cable only when `CABLE_URL` is set (`async` adapter otherwise), so a deploy never breaks for a missing database. Declare each Solid database in `database.yml` only when its URL is present, set `config.cache_store` in `config/environments/*.rb` (an initializer runs after `Rails.cache` is built), and keep the custom `db:migrate` creating each Solid table only when missing (`db:cache:prepare`, `db:cable:prepare`): a schema load on every deploy would wipe the cache and the sessions stored in it.
 
 ```ruby
 # config/initializers/lucid_case.rb — Query cache uses Rails.cache (Solid Cache);
@@ -537,7 +537,7 @@ Never give an env var a default in code: use `ENV.fetch("VAR")` (raises if missi
 A project that deploys `staging` and `production` from the same image still needs a real `staging` Rails environment, so `ENV=staging` locally and the remote console match the deployed one.
 
 - `config/environments/staging.rb`: `require_relative "production"` plus `config.log_level = ENV.fetch("RAILS_LOG_LEVEL")` (debug in staging). Never copy `production.rb`.
-- Add `staging:` wherever `production:` is keyed: `database.yml` (`staging: <<: *production`, so `production: &production` needs the anchor), `cable.yml` (own `channel_prefix`), and every `Rails.env.production?` / `ENV["RAILS_ENV"] == "production"` check (Puma workers, PDF binary path), otherwise staging silently runs the dev branch.
+- Add `staging:` wherever `production:` is keyed: `database.yml` (`staging: <<: *production`, so `production: &production` needs the anchor), `cable.yml` (`staging: <<: *production`), and every `Rails.env.production?` / `ENV["RAILS_ENV"] == "production"` check (Puma workers, PDF binary path), otherwise staging silently runs the dev branch.
 - `br4zz4/commons` exports only `ENVIRONMENT`, never `RAILS_ENV`. Every `run/*` that boots Rails sources `lib/rails_env.sh`, which maps `ENVIRONMENT` to `RAILS_ENV` (`development`, `test`, `staging`, `production`; anything else exits 64). Without it `make core.console ENV=staging` opens a dev console on the local database.
 - Destructive scripts (`db.create`, `db.drop`, `db.reset`, `db.rollback`, `db.prepare`) source `lib/local_env.sh`, which calls `rails_env.sh` and refuses anything but development and test. `console`, `routes`, `db.migrate*` and `db.seed` may target staging and production; the commons asks for the project name on restricted environments.
 - The console prompt shows the env (`(prod)`, `(staging)`): check it before pasting data-changing code.
