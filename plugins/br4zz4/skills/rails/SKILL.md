@@ -1,7 +1,7 @@
 ---
 name: rails
 description: Use when writing or reviewing Rails code.
-version: 1.6.0
+version: 1.7.0
 ---
 
 # commons:rails
@@ -15,7 +15,7 @@ Principles and laws live in `br4zz4:architecture`. This skill is the Rails appli
 ```ruby
 # Gemfile
 gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.1.0"
-gem "lucid-tenancy", github: "br4zz4/lucid-tenancy", tag: "v0.1.2" # multi-tenant apps only
+gem "lucid-tenancy", github: "br4zz4/lucid-tenancy", tag: "v0.1.6" # multi-tenant apps only
 gem "solid_queue"
 gem "solid_cache"
 # with RabbitMQ: gem "bunny" (publish) + gem "sneakers" (consume)
@@ -500,6 +500,11 @@ Lucid::Tenancy.each { |tenant| ... }                         # iterate every ten
 - The middleware resolves the tenant at the port and Active Job carries it; outside a request (jobs without it, console, seeds, tasks) wrap code in `with`, `each` or `shared`. Never set the tenant inside a use case.
 - Isolation is the schema: never filter by `organization_id`/`tenant_id`.
 - Cached queries scope their key by tenant (see `Lucid::Case.configure` above).
+- Declare `tenancy :tenant|:shared` followed by a blank line. The project enforces it with a custom cop (`Lucid/BlankLineAfterTenancy`) run as a second rubocop pass over `db/migrate` with `.rubocop_migrations.yml`, because `db/**` is excluded from the main config; `lint.fix` runs both passes.
+- Never call `set(tenant:)` without a block in a controller, reflex or cable connection: the state stays on the server thread and leaks into the next request. Use `around_action`, `around_reflex` and, for Action Cable, `include Lucid::Tenancy::ActionCable` in `ApplicationCable::Connection` (`around_command` also covers the StimulusReflex page morph, which runs after `around_reflex`).
+- Resolve the tenant only from hosts under `base_domain`: with it set there is no subdomain fallback, `config.hosts = [".#{base_domain}"]` (health check `/up` excluded) and mailer URLs are built from `base_domain`, never from `request.domain` (host header poisoning).
+- Seeds find by key: `Model.find_or_create_by!(key) { ... }`, never `first_or_create!` (it returns any existing row, so a second tenant is never created). Check pending migrations with `Lucid::Tenancy::Migrator.pending`, not a custom rake task.
+- Gem behaviour that bit us (fixed in 0.1.5 and 0.1.6): switching schema must clear the Active Record query cache, otherwise the same SQL in another tenant is answered with the previous tenant's rows; a freshly provisioned tenant must have every tenant migration version recorded, otherwise the next `db:migrate` replays them (`relation already exists`). Data from the wrong tenant, or `already exists` on a new tenant, points here first.
 
 ## Environments (k8s)
 
@@ -539,6 +544,8 @@ end
 **`config.hosts`** is always configured via `RAILS_ALLOWED_HOSTS` env var — injected by k8s per environment overlay. Never hardcode hostnames in the config file.
 
 ### Environment variables — never default
+
+Env vars name what the thing is, never the implementation: `DATABASE_URL`, `CACHE_URL`, `CABLE_URL`, and for parts `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `WEB_PORT` (never `REDIS_URL`, `DB_PORT`, `SERVER_PORT`). Compose and run scripts follow the same rule with no default: `${DATABASE_PORT:?set DATABASE_PORT in .env}`.
 
 Never give an env var a default in code: use `ENV.fetch("VAR")` (raises if missing). `ENV.fetch("VAR", default)`, `ENV.fetch("VAR") { default }` and `ENV["VAR"] || default` are forbidden — missing config must fail loudly. Only add a default when explicitly requested for that var. See `@rules/shared/env.md`.
 

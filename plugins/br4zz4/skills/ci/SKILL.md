@@ -83,6 +83,18 @@ O projeto mantém dois vaults:
 ```
 
 GitHub recebe `WARD_KEY_<NS>` e `WARD_KEY_<NS>_RESTRICTED`. Nunca secrets colados à mão no GitHub.
+### Fora do `br4zz4/pipelines` (gems, libs)
+
+- Workflow próprio com runner **fixo** (`ubuntu-24.04`, `macos-latest`), nunca `ubuntu-latest`: a imagem muda sob você (a action de Postgres quebrou com `apt-key` ausente).
+- `ikalnytskyi/action-setup-postgres` exige `postgres-version` explícito; use o output `connection-uri` como `DATABASE_URL`.
+- Gem de Ruby: matriz ubuntu com o Ruby mínimo e o atual, mais macOS com o atual. A suíte da gem que fala com o banco roda em todos.
+- Depois de `git push` de tag ou de main, confira o run (`gh run watch`) antes de dizer que está pronto.
+
+### Build da imagem no hook
+
+- `ci/checks/build.sh` chama `.commons/bin/commons build-image <módulo> release --platform linux/amd64 --tag <imagem>:<tag>` e dá `docker push`. O checkout do CI não baixa submódulo: rode `git submodule update --init --depth 1 .commons` antes.
+- O build da imagem não tem os segredos de runtime. Código de `config/environments/production.rb` que exige uma variável precisa de uma saída para o `assets:precompile` (`SECRET_KEY_BASE_DUMMY` definido), senão o build quebra só no CI.
+- O CI faz eager load de `lib/`: arquivo em `lib/` que não é código da app (cops do rubocop, scripts) sai do autoload (`config.autoload_lib(ignore: %w[... rubocop])`), ou o Zeitwerk derruba a suíte.
 
 ### Como proceder
 

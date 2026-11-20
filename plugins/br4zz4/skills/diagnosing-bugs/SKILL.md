@@ -34,6 +34,8 @@ Put in far more effort here than feels proportionate. **Be aggressive, be invent
 9. **Differential loop.** Pass the same input through the old and new version (or two configs) and diff the outputs.
 10. **HITL bash script.** The last resort. When a human has to click, direct _them_ with `HITL-LOOP.md` so the loop stays structured, and the captured output flows back to you.
 
+**Reproduce in the failing execution context, not in a lookalike.** `rails runner`, requests and jobs run inside the Rails executor (query cache on); a bare `rake` task or a plain script does not. A bug that shows up in one and not the other is context state (query cache, thread-local state, `search_path`, connection pool), so reproduce it in the context that fails before theorising.
+
 With the right feedback loop in hand, 90% of the bug is already fixed.
 
 ### Tighten the loop
@@ -122,7 +124,7 @@ A correct seam makes the test exercise the **real bug pattern** the way it occur
 With a correct seam available:
 
 1. Turn the minimised repro into a test at that seam, written so it fails.
-2. Confirm that it fails.
+2. Confirm that it fails, and later that it fails *without the fix*: stash only the fix, run the test, restore the fix and `diff` to confirm it is identical. A regression test that also passes without the fix proves nothing (a passing suite missed a whole bug class once because no test exercised the path that failed).
 3. Make the fix.
 4. Confirm that it passes.
 5. Run the Phase 1 feedback loop again, against the original (un-minimised) scenario.
