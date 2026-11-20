@@ -1,7 +1,7 @@
 ---
 name: rails
 description: Use when writing or reviewing Rails code.
-version: 1.5.0
+version: 1.6.0
 ---
 
 # commons:rails
@@ -15,6 +15,7 @@ Principles and laws live in `br4zz4:architecture`. This skill is the Rails appli
 ```ruby
 # Gemfile
 gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.1.0"
+gem "lucid-tenancy", github: "br4zz4/lucid-tenancy", tag: "v0.1.2" # multi-tenant apps only
 gem "solid_queue"
 gem "solid_cache"
 # with RabbitMQ: gem "bunny" (publish) + gem "sneakers" (consume)
@@ -482,6 +483,23 @@ end
 ```
 
 Reactions go through the relay as usual. Outbound webhooks (we POST to their endpoint) are `Webhooks::Deliver` in bridges, triggered by the event flow.
+
+## Multi-tenancy
+
+Schema per tenant (Postgres) through the `lucid-tenancy` gem (`github: "br4zz4/lucid-tenancy", tag: "v0.1.2"`). Never `acts_as_tenant`; never hand-rolled `search_path` wrappers (`SET search_path`, `Apartment`-style switchers).
+
+```ruby
+Lucid::Tenancy.with(tenant: org) { Student.create!(...) }   # run inside a tenant, restores after
+Lucid::Tenancy.shared { Organization.find(id) }              # run in the shared (public) schema
+Lucid::Tenancy.set(tenant: org)                              # switch for the rest of the request/job
+Lucid::Tenancy.each { |tenant| ... }                         # iterate every tenant (batches, backfills)
+```
+
+- Declare where a thing lives with `tenancy :tenant` or `tenancy :shared` in migrations, models and jobs; a migration without it fails. Tenant migrations carry no guards or wrappers (`table_exists?`, `in_*`, `for_all_tenants`).
+- Tenant tables come from the template schema, dumped to `db/schema_tenant.rb` and used to provision new tenants. After changing tenant migrations run `rake lucid:tenancy:dump`; CI runs `rake lucid:tenancy:check`. Pre-existing tenants: `rake lucid:tenancy:baseline`.
+- The middleware resolves the tenant at the port and Active Job carries it; outside a request (jobs without it, console, seeds, tasks) wrap code in `with`, `each` or `shared`. Never set the tenant inside a use case.
+- Isolation is the schema: never filter by `organization_id`/`tenant_id`.
+- Cached queries scope their key by tenant (see `Lucid::Case.configure` above).
 
 ## Environments (k8s)
 
