@@ -10,6 +10,8 @@ version: 3.0.0
 
 When exploring the codebase, read `CONTEXT.md` (if it exists) so test names and interface vocabulary match the project's domain language, and respect ADRs in the area you are touching.
 
+In projects with the commons, run every test, lint and audit command through `make <module>.<target>` (for example `make core.test ARGS="spec/x_spec.rb"`) or, when there is no target, `docker compose --profile tools run --rm <service> <command>`; never on the host. See `br4zz4:make`.
+
 ---
 
 ## The Iron Law

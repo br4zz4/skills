@@ -1,7 +1,7 @@
 ---
 name: docker
 description: Use when creating or reviewing Docker files.
-version: 4.0.0
+version: 4.1.0
 ---
 
 # br4zz4:docker
@@ -34,6 +34,7 @@ services:
 ```
 
 - Compose ≥ 2.20 (`include:`). `make up` sobe com `--wait`; `make down` mantém os volumes.
+- **Comandos sempre no container.** Com target `make`, use-o; sem target, `docker compose --profile tools run --rm <serviço> <comando>`. Nunca rode o app, os testes ou o `rake` no host (detalhes em `br4zz4:make`).
 - **Dependências no compose.** O serviço do módulo declara `depends_on` com `condition: service_healthy`; o que precisa de banco roda pelo compose (`docker compose run --rm core ...`). Nunca orquestre dependência no Makefile, em script wrapper ou numa função do commons.
 - Fragments: `database` (`postgres:16-alpine`), `mail` (`mailpit`, só local), `cache` (Redis, opt-in; Rails usa Solid Cache no Postgres e registra a exceção em ADR se precisar de Redis).
 - **Sem default e sem prefixo.** Portas e credenciais vêm do `.env`, com erro se faltarem (`${DATABASE_PORT:?set DATABASE_PORT in .env}`): `DATABASE_PORT`, `DATABASE_USERNAME`, `DATABASE_PASSWORD`, `MAIL_PORT`, `SMTP_PORT`, `CACHE_PORT`. O nome diz o que é, não a implementação (`DATABASE_*`, nunca `DB_*`; `WEB_PORT`, nunca `SERVER_PORT`).

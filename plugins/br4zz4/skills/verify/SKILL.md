@@ -8,6 +8,8 @@ version: 1.0.0
 
 > **TLDR**: Run the actual verification command, read the full output, then make the claim. Evidence before assertions, always.
 
+In projects with the commons, run every test, lint and audit command through `make <module>.<target>` (for example `make core.test ARGS="spec/x_spec.rb"`) or, when there is no target, `docker compose --profile tools run --rm <service> <command>`; never on the host. See `br4zz4:make`.
+
 ---
 
 ## The Iron Law

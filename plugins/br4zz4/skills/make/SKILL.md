@@ -1,7 +1,7 @@
 ---
 name: make
 description: Use when writing or modifying Makefile targets.
-version: 3.1.0
+version: 3.2.0
 ---
 
 # br4zz4:make
@@ -32,6 +32,16 @@ include .project/make/*.mk
 - O nome do target é o nome do arquivo em `run/` sem prefixo: `run/db.seed` vira `make core.db.seed` (não existe `core.run.seed`).
 - Argumentos: `ARGS="..."`. Ambiente: `ENV=` (default por tipo de comando, vindo do `commons.ctx`). Ambiente restrito pede `CONFIRM=<projeto>` fora de TTY.
 - O ambiente vem do ward (`COMMONS_SCOPE`) e o toolchain do `mise.toml` do lado; o script roda com cwd no dir do lado e `MODULE`, `ENVIRONMENT`, `TAG`, `CI_CACHE_DIR`.
+
+## Como rodar comandos do projeto (agentes e pessoas)
+
+O ambiente correto é o container do módulo, com as dependências sobe pelo compose. Por isso:
+
+1. **Existe target `make`? Use o target.** `make core.test`, `make core.lint`, `make core.db.migrate`, `make core.db.seed`, `make core.console`. `make help` lista tudo. Os scripts de `run/` rodam no serviço do módulo (`docker compose run --rm`), com o banco e os demais serviços de pé pelo `depends_on`.
+2. **Não existe target? Rode dentro do container**, nunca no host: `docker compose --profile tools run --rm core <comando>` (ex.: `bin/rails runner '...'`, `bundle exec rspec spec/models/x_spec.rb`, `bundle exec rake lucid:tenancy:status`). Isso é o mesmo ambiente do `make`.
+3. **Nunca rode `bundle`, `rails`, `rspec` ou `rake` direto no host** nem exporte `DATABASE_*`/`WARD_CONTEXT` à mão para fazê-los funcionar: isso testa outro ambiente (outra versão de gems, outro host de banco, sem o `ward` real) e esconde o que o dev vai encontrar. Se um comando só funciona no host com variáveis exportadas, o ambiente do container está errado e é isso que se conserta.
+4. Argumentos: `make core.test ARGS="spec/models/x_spec.rb"`. Comando repetido que não tem target vira `run/<nome>` (e ganha target), não um one-liner colado em docs.
+5. O trabalho termina com o ambiente pronto: banco migrado e populado no container, imagem de dev construída, `git status` limpo, para a próxima pessoa só rodar `make core.start`.
 
 ## Regras
 
