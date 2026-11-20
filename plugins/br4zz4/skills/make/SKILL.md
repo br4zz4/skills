@@ -1,7 +1,7 @@
 ---
 name: make
 description: Use when writing or modifying Makefile targets.
-version: 3.2.0
+version: 3.3.0
 ---
 
 # br4zz4:make
@@ -21,7 +21,8 @@ include .project/make/*.mk
 
 | make | roda |
 |---|---|
-| `<m>.lint` `<m>.audit` `<m>.test` `<m>.build` | `<code>/ci/checks/<step>.sh` |
+| `<m>.lint` `<m>.audit` `<m>.test` | `<code>/run/<step>` no container do módulo (cai em `ci/checks/<step>.sh` se não existir) |
+| `<m>.build` | `<code>/ci/checks/build.sh` |
 | `<m>.validate` `<m>.plan` | `<infra>/ci/checks/<step>.sh` |
 | `<m>.<nome>` | `<code>/run/<nome>` (um target por arquivo) |
 | `<m>.shell` `<m>.db` `<m>.keys` | shell, `psql "$DATABASE_URL"`, nomes das chaves do escopo |

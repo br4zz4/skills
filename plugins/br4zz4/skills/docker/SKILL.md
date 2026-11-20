@@ -1,7 +1,7 @@
 ---
 name: docker
 description: Use when creating or reviewing Docker files.
-version: 4.1.0
+version: 4.2.0
 ---
 
 # br4zz4:docker
@@ -44,6 +44,23 @@ services:
 - `bin/init` do commons gera o `compose.yml` a partir dos `services` do `.github/modules.json` (`postgres`, `redis`).
 - Serviço que o commons não oferece: o projeto o define no próprio `compose.yml`. Quando dois projetos repetirem o mesmo, ele vira fragment do commons.
 
+### Serviço do módulo por `extends`
+
+O commons traz `compose/module.yml`, um serviço-base de dev. O projeto só declara o que é dele:
+
+```yaml
+services:
+  core:
+    extends: {file: .commons/compose/module.yml, service: module}
+    image: <projeto>-core:dev
+    environment:
+      WARD_CONTEXT: secrets.core.code.development
+    volumes:
+      - ./modules/core/code:/source
+```
+
+A base traz `working_dir`, o `.env` da raiz, `DATABASE_HOST`, `SMTP_HOST`, a fiação do ward, a porta `WEB_PORT`, o vault somente leitura e `depends_on: database (healthy)`. Caminhos relativos resolvem a partir de `.commons/compose/`.
+
 ## Imagem: um Dockerfile, no commons
 
 Não há `Dockerfile` no módulo. O commons guarda `docker/Dockerfile.tmpl` e as stacks (`ruby`, `go`, `elixir`); o módulo só configura.
@@ -60,6 +77,8 @@ modules/<m>/code/.module/
 - **Cache:** cada etapa copia só os próprios scripts; `deps` copia só os manifestos (`Gemfile`, `Gemfile.lock`), então o `bundle install` só reexecuta quando eles mudam. Em `dev` o código **não entra na imagem**: ele vem por volume (`./modules/core/code:/source`), então editar código nunca reconstrói. O `COPY . .` existe só na etapa `source` do `release`.
 - `.dockerignore` do módulo exclui `.git`, `tmp`, `log`, `.ci-cache`, `.module`, `node_modules`, chaves e `.env`: um diretório de cache de 1 GB no contexto custa minutos por build.
 - Sem segredos na imagem; eles chegam em runtime pelo provedor (Secret push). O `assets:precompile` do build roda sem as variáveis de runtime (`SECRET_KEY_BASE_DUMMY`).
-- Shell interativo no container (`run/shell`): constrói a imagem de dev e roda `docker compose run --rm core zsh`; termina com status 0 (o status do último comando do shell não é erro do make).
+- `make <m>.shell` é nativo no commons: constrói a imagem de dev e abre `zsh` (ou `$COMMONS_SHELL`) no serviço do módulo, sempre saindo com 0 (o status do último comando do shell não é erro do make). Um `run/shell` do módulo sobrescreve. Só `start` e `server` publicam as portas do serviço; os demais `run/*` rodam sem porta, então duas execuções nunca disputam a mesma porta.
+- Variáveis que o `assets:precompile` precisa no build (a imagem não tem os segredos de runtime) ficam em `.module/precompile.env` (`KEY=VALUE`), que só entra na etapa `release` e não invalida o cache de dependências. Nunca ponha guard de build no código do app.
+- Teste em container: o `run/test` cria um banco por execução (sufixo aleatório em `TEST_ENV_NUMBER`, dropado ao sair), então execuções simultâneas não se atropelam. Dentro do container o PID é 1: não use `$$` como identificador único.
 - O build de produção é `linux/amd64`; em Mac `arm64` o aviso de plataforma de imagens `amd64` (ex.: `postgres`) é só emulação, não erro.
 - Colima, não Docker Desktop: `exporting` e `unpacking` são lentos por E/S da VM; ajuste com `colima start --cpu N --memory N`. Nada disso sobe para o registry sem `docker push`.

@@ -1,7 +1,7 @@
 ---
 name: ci
 description: Use when creating or reviewing GitHub Actions files.
-version: 3.0.0
+version: 3.1.0
 ---
 
 # br4zz4:ci
@@ -37,10 +37,12 @@ modules/<m>/infra/
 
 | Contexto | Steps | Fase |
 |---|---|---|
-| `ci/checks/` | `lint`, `audit`, `test` | PR e main |
+| `run/` (ou `ci/checks/`) | `lint`, `audit`, `test` | PR e main |
 | `ci/checks/` | `validate`, `plan` | PR e main |
 | `ci/checks/` | `build` | main (build da imagem) |
 | `ci/deploy/` | `apply`, `rollout`, `verify`, `rollback` | deploy |
+
+`lint`, `audit` e `test` são `run/<passo>` (a mesma implementação roda local no container, pelo `make`, e no CI, direto no runner); o `ci/checks/<passo>.sh` continua aceito. `build`, `validate` e `plan` seguem só em `ci/checks/`. O `conform` aceita um ou outro.
 
 Cada hook é **obrigatório**. Um hook sem nada a fazer printa por quê e sai 0. Um script fora do vocabulário é rejeitado pelo `conform`.
 
