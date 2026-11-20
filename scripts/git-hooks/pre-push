@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# git has no post-push hook: pre-push detaches a bounded poller that runs
+# br4zz4-skills-sync once origin/main contains the pushed commit.
+set -u
+
+remote="$1"
+sha=""
+while read -r _ local_sha remote_ref _; do
+  [ "$remote_ref" = "refs/heads/main" ] && sha="$local_sha"
+done
+[ -n "$sha" ] || exit 0
+
+sync="$(command -v br4zz4-skills-sync || true)"
+[ -n "$sync" ] || sync="$HOME/.qwert/bin/br4zz4-skills-sync"
+[ -x "$sync" ] || exit 0
+
+(
+  for _ in $(seq 1 30); do
+    remote_sha="$(git ls-remote "$remote" refs/heads/main 2>/dev/null | cut -f1)"
+    if [ "$remote_sha" = "$sha" ]; then
+      "$sync" >/dev/null 2>&1
+      exit 0
+    fi
+    sleep 2
+  done
+) </dev/null >/dev/null 2>&1 &
+
+exit 0
