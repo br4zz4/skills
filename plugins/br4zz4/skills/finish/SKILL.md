@@ -1,7 +1,7 @@
 ---
 name: finish
 description: Use when implementation is complete and you need to integrate the work and clean up.
-version: 2.1.0
+version: 2.2.0
 ---
 
 # br4zz4:finish
@@ -147,7 +147,25 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ```
 
 - Print `FINISHED` only when the DoD is fully ticked, the work is integrated and the staging ping is ok (or `staging: none`)
-- Anything still open (PR awaiting merge, failed ping, dirty worktree) → print `⏳ P E N D I N G` in the same frame, listing what is missing, never `FINISHED`
+- Anything still open (PR awaiting merge, failed ping, dirty worktree) → print `⏳ P E N D I N G` in the same frame, never `FINISHED`. List every todo item: `✔` for done, `☐` for pending (same items as the `todowrite` list), so the user sees progress and what is missing:
+
+```
+╔══════════════════════════════════════════╗
+║                                          ║
+║     ⏳  P E N D I N G  ⏳                ║
+║                                          ║
+║  spec: docs/specs/<file>.md              ║
+║                                          ║
+║  ✔ tasks do how (4/4)                    ║
+║  ✔ testes verdes 2×                      ║
+║  ✔ review                                ║
+║  ✔ integração (PR #123 aberto)           ║
+║  ☐ merge do PR #123                      ║
+║  ☐ ping em staging                       ║
+║  ☐ definition of done (5/7)              ║
+║                                          ║
+╚══════════════════════════════════════════╝
+```
 - No spec: omit the `spec:` line
 
 ---
