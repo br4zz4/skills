@@ -35,7 +35,7 @@ include .project/make/*.mk
 
 ## Como rodar comandos do projeto (agentes e pessoas)
 
-O ambiente correto é o container do módulo, com as dependências sobe pelo compose. Por isso:
+O ambiente correto é o container do módulo, com as dependências de pé pelo compose. Por isso:
 
 1. **Existe target `make`? Use o target.** `make core.test`, `make core.lint`, `make core.db.migrate`, `make core.db.seed`, `make core.console`. `make help` lista tudo. Os scripts de `run/` rodam no serviço do módulo (`docker compose run --rm`), com o banco e os demais serviços de pé pelo `depends_on`.
 2. **Não existe target? Rode dentro do container**, nunca no host: `docker compose --profile tools run --rm core <comando>` (ex.: `bin/rails runner '...'`, `bundle exec rspec spec/models/x_spec.rb`, `bundle exec rake lucid:tenancy:status`). Isso é o mesmo ambiente do `make`.
