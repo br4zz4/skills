@@ -1,12 +1,12 @@
 ---
 name: finish
 description: Use when implementation is complete and you need to integrate the work and clean up.
-version: 2.0.0
+version: 2.1.0
 ---
 
 # br4zz4:finish
 
-> **TLDR**: Suíte verde → DoD marcado → docs → integra conforme `integration:` do repo (sem perguntar) → devolve a sessão à raiz → remove a worktree → apaga a branch. Nada é integrado nem removido com testes vermelhos.
+> **TLDR**: Suíte verde → DoD marcado → docs → integra conforme `integration:` do repo (sem perguntar) → devolve a sessão à raiz → remove a worktree → apaga a branch → imprime o banner FINISHED. Nada é integrado nem removido com testes vermelhos.
 
 ---
 
@@ -127,6 +127,28 @@ Merging on `main` is what deploys to staging. After integration, ping the create
 - `integration: main`: ping right after the push.
 - `integration: pr`: report "aguardando merge"; ping once the user says the PR was merged.
 - A failed ping is not rolled back: fix forward with a new commit/PR, or report it. Mark the staging item of the spec's DoD only with a successful ping.
+
+---
+
+## Step 7 — FINISHED banner
+
+Last output of the turn, after every previous step. Print it as a code block so the user sees at a glance that the work is over:
+
+```
+╔══════════════════════════════════════════╗
+║                                          ║
+║     ✅  F I N I S H E D  ✅              ║
+║                                          ║
+║  spec: docs/specs/<file>.md              ║
+║  DoD: completo · suíte verde             ║
+║  integração: <main|pr> · staging: <ok>   ║
+║                                          ║
+╚══════════════════════════════════════════╝
+```
+
+- Print `FINISHED` only when the DoD is fully ticked, the work is integrated and the staging ping is ok (or `staging: none`)
+- Anything still open (PR awaiting merge, failed ping, dirty worktree) → print `⏳ P E N D I N G` in the same frame, listing what is missing, never `FINISHED`
+- No spec: omit the `spec:` line
 
 ---
 

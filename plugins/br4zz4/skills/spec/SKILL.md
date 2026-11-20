@@ -1,7 +1,7 @@
 ---
 name: spec
 description: Use when the user asks to spec, plan, or document a change — the spec includes the implementation plan (tasks) and ends with a checkable checklist.
-version: 5.0.0
+version: 5.1.0
 ---
 
 # br4zz4:spec
@@ -169,6 +169,7 @@ Checklist com o necessário para concluir a atividade **sem erros**. Base (obrig
 - [ ] Toda task do "how" executada
 - [ ] Documentação atualizada (ou "no doc changes" declarado)
 - [ ] Staging: merge na main feito (é o que dispara o deploy) e todas as telas criadas/editadas respondem no ping (ou `staging: none` declarado no `AGENTS.md` do repo)
+- [ ] Banner `FINISHED` impresso como última saída (`br4zz4:finish`, Step 7), só com todos os itens acima marcados
 
 Se a spec tem PRs sequenciais, inclua também: `- [ ] Cada PR da sequência validado isoladamente (build e testes verdes sem os PRs seguintes)` e `- [ ] Último PR liga a funcionalidade e remove código temporário`.
 
