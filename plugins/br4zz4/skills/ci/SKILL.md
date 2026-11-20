@@ -1,7 +1,7 @@
 ---
 name: ci
 description: Use when creating or reviewing GitHub Actions files.
-version: 3.3.0
+version: 3.4.0
 ---
 
 # br4zz4:ci
@@ -99,7 +99,7 @@ GitHub recebe `WARD_KEY_<NS>` e `WARD_KEY_<NS>_RESTRICTED`. Nunca secrets colado
 - O que o CI publica é o vault **commitado**: `ward set` local não chega ao deploy sem commit e push.
 - `terraform import` de um secret criado por fora precisa importar também a versão (`.../versions/1`), senão o apply cria uma `CHANGE_ME` por cima do valor real. Um secret renomeado destrói o antigo e cria o novo: publique o valor antes do rollout.
 - Bump de provider de Terraform: `validate` não basta, rode `plan` contra o state real (numa cópia, com `TF_DATA_DIR` próprio) e troque a restrição em **todos** os `versions.tf`/`main.tf`. Majors que renomeiam recursos (cloudflare 4→5) exigem migração de state e não entram por merge automático. `.terraform.lock.hcl` fica no `.gitignore`.
-- Troca de tipo de recurso entre majors de provider (ex.: `cloudflare_record` → `cloudflare_dns_record` no cloudflare 5): use um bloco `moved { from = ..., to = ... }`, não `terraform state mv` (recusa tipos diferentes) nem recriar. Valide abrindo um PR: o job `plan` do CI tem as credenciais que você não tem local e mostra `has moved to` sem `destroy`. O `apply` de pré-requisitos usa `-target`, e o Terraform recusa o `moved` com `Moved resource instances excluded by targeting`: inclua os dois endereços (antigo e novo) nos alvos (`TF_PRE_TARGETS`) por um deploy e remova-os no commit seguinte.
+- Troca de tipo de recurso entre majors de provider (ex.: `cloudflare_record` → `cloudflare_dns_record` no cloudflare 5): use um bloco `moved { from = ..., to = ... }`, não `terraform state mv` (recusa tipos diferentes) nem recriar. Valide abrindo um PR: o job `plan` do CI tem as credenciais que você não tem local e mostra `has moved to` sem `destroy`. O `apply` com `-target` (pré-requisitos e migrate) recusa o `moved` com `Moved resource instances excluded by targeting`; o `apply.sh` do projeto deve ler os `-target="..."` que o Terraform sugere e repetir o apply com eles (função `targeted_apply`), sem edição manual de alvos e sem repetir em erro de outro tipo.
 - Sintaxe do cloudflare 5: `data "cloudflare_zones"` recebe `name = ...` (sem bloco `filter`) e devolve `result[0].id`; `cloudflare_dns_record` exige `ttl` e `name` completo (FQDN, o host inteiro, não o relativo).
 - Dependabot não deve atualizar `actions/*` dentro de workflows gerados pelos pipelines: o `conform` reprova. O bump sai na origem (`render.py` e tag `v1`) e o projeto re-renderiza (`render.py --root . --ref v1`).
 - Conexão com o Postgres do Neon: `-pooler` (PgBouncer em modo transaction) não preserva `SET search_path`; use o endpoint direto. A `lucid-tenancy` recusa o boot com `-pooler`.
