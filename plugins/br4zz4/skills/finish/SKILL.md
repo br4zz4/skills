@@ -1,7 +1,7 @@
 ---
 name: finish
 description: Use when implementation is complete and you need to integrate the work and clean up.
-version: 2.2.0
+version: 2.3.0
 ---
 
 # br4zz4:finish
@@ -140,6 +140,7 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ║     ✅  F I N I S H E D  ✅              ║
 ║                                          ║
 ║  spec: docs/specs/<file>.md              ║
+║  ████████████████████  7/7 (100%)        ║
 ║  DoD: completo · suíte verde             ║
 ║  integração: <main|pr> · staging: <ok>   ║
 ║                                          ║
@@ -155,6 +156,7 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ║     ⏳  P E N D I N G  ⏳                ║
 ║                                          ║
 ║  spec: docs/specs/<file>.md              ║
+║  ████████████░░░░░░░░  4/7 (57%)         ║
 ║                                          ║
 ║  ✔ tasks do how (4/4)                    ║
 ║  ✔ testes verdes 2×                      ║
@@ -167,6 +169,7 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ╚══════════════════════════════════════════╝
 ```
 - No spec: omit the `spec:` line
+- Progress bar right below the `spec:` line: 20 cells, `█` filled and `░` empty, `done/total (pct%)` counted over the todo items (the `✔`/`☐` list). `FINISHED` is always 100%
 
 ---
 
