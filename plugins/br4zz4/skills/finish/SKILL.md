@@ -1,7 +1,7 @@
 ---
 name: finish
 description: Use when implementation is complete and you need to integrate the work and clean up.
-version: 2.3.0
+version: 2.4.0
 ---
 
 # br4zz4:finish
@@ -132,7 +132,7 @@ Merging on `main` is what deploys to staging. After integration, ping the create
 
 ## Step 7 — FINISHED banner
 
-Last output of the turn, after every previous step. Print it as a code block so the user sees at a glance that the work is over:
+Printed as the **last output of every turn while a spec is being executed**, not only at the very end. Every pause counts: waiting for a subagent, waiting for the user's answer or approval, a PR awaiting merge, a failed step. A turn that ends without a banner is a bug. Print it as a code block so the user sees at a glance whether the work is over:
 
 ```
 ╔══════════════════════════════════════════╗
@@ -147,6 +147,7 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ╚══════════════════════════════════════════╝
 ```
 
+- Every turn that ends mid-spec prints `PENDING`; only the turn that closes the spec prints `FINISHED`
 - Print `FINISHED` only when the DoD is fully ticked, the work is integrated and the staging ping is ok (or `staging: none`)
 - Anything still open (PR awaiting merge, failed ping, dirty worktree) → print `⏳ P E N D I N G` in the same frame, never `FINISHED`. List every todo item: `✔` for done, `☐` for pending (same items as the `todowrite` list), so the user sees progress and what is missing:
 
@@ -157,6 +158,7 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ║                                          ║
 ║  spec: docs/specs/<file>.md              ║
 ║  ████████████░░░░░░░░  4/7 (57%)         ║
+║  pausa: aguardando tester (green 2×)     ║
 ║                                          ║
 ║  ✔ tasks do how (4/4)                    ║
 ║  ✔ testes verdes 2×                      ║
@@ -169,6 +171,8 @@ Last output of the turn, after every previous step. Print it as a code block so 
 ╚══════════════════════════════════════════╝
 ```
 - No spec: omit the `spec:` line
+- `PENDING` always has a `pausa:` line right below the bar with the reason the turn stopped and what resumes it (`aguardando tester`, `aguardando sua aprovação`, `aguardando merge do PR #n`, `ping falhou`)
+- Print it again on every pause with the current state: the todo list and the bar must match the latest `todowrite`
 - Progress bar right below the `spec:` line: 20 cells, `█` filled and `░` empty, `done/total (pct%)` counted over the todo items (the `✔`/`☐` list). `FINISHED` is always 100%
 
 ---
