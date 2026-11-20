@@ -1,7 +1,7 @@
 ---
 name: ci
 description: Use when creating or reviewing GitHub Actions files.
-version: 3.1.0
+version: 3.2.0
 ---
 
 # br4zz4:ci
@@ -91,6 +91,15 @@ GitHub recebe `WARD_KEY_<NS>` e `WARD_KEY_<NS>_RESTRICTED`. Nunca secrets colado
 - `ikalnytskyi/action-setup-postgres` exige `postgres-version` explícito; use o output `connection-uri` como `DATABASE_URL`.
 - Gem de Ruby: matriz ubuntu com o Ruby mínimo e o atual, mais macOS com o atual. A suíte da gem que fala com o banco roda em todos.
 - Depois de `git push` de tag ou de main, confira o run (`gh run watch`) antes de dizer que está pronto.
+
+### Secrets derivados e limpeza no deploy
+
+- O `ops/secrets.sh` do projeto publica os valores do escopo ward e pode **derivar** outros no deploy (por exemplo `CACHE_URL` e `CABLE_URL` da `DATABASE_URL`, trocando só o nome do banco): a senha não vira valor novo no ward nem entra no state do Terraform, e o job de migrate cria os bancos com `db:create` (sem `psql` no runner) e as tabelas com `db:cache:prepare` e `db:cable:prepare`. A lista de chaves do Terraform (`TF_VAR_app_secret_keys`) inclui as derivadas.
+- O mesmo script remove secrets órfãos do ambiente (`PRUNE_ORPHANS=1`): só os de prefixo `<projeto>-<env>-` (filtrado no shell, nunca confie no filtro do `gcloud`), que não estejam na lista, e recusa apagar mais de 3 de uma vez.
+- O que o CI publica é o vault **commitado**: `ward set` local não chega ao deploy sem commit e push.
+- `terraform import` de um secret criado por fora precisa importar também a versão (`.../versions/1`), senão o apply cria uma `CHANGE_ME` por cima do valor real. Um secret renomeado destrói o antigo e cria o novo: publique o valor antes do rollout.
+- Bump de provider de Terraform: `validate` não basta, rode `plan` contra o state real (numa cópia, com `TF_DATA_DIR` próprio) e troque a restrição em **todos** os `versions.tf`/`main.tf`. Majors que renomeiam recursos (cloudflare 4→5) exigem migração de state e não entram por merge automático. `.terraform.lock.hcl` fica no `.gitignore`.
+- Conexão com o Postgres do Neon: `-pooler` (PgBouncer em modo transaction) não preserva `SET search_path`; use o endpoint direto. A `lucid-tenancy` recusa o boot com `-pooler`.
 
 ### Build da imagem no hook
 
