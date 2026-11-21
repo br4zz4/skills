@@ -34,8 +34,11 @@ Every project vault follows a single shape — **module first, kind second, envi
   projects; `api`, `frontend`, … in multi-module ones). It matches
   `modules/<module>/` exactly.
 - **`code`** — anything the module's running application needs (`SECRET_KEY_BASE`,
-  `NEON_DATABASE_URL`, `RESEND_API_KEY`, API tokens). These are the secrets pushed to
-  the runtime secret store and injected as env vars.
+  `RESEND_API_KEY`, API tokens). These are the secrets pushed to the runtime secret store and
+  injected as env vars. A database connection string created by Terraform (Neon:
+  `DATABASE_URL`, `CACHE_URL`, `CABLE_URL`) is **not** a ward secret: Terraform writes it
+  straight into the secret store, and the push script skips it (see `br4zz4:rails`, "Deploy
+  default: Cloud Run + Neon").
 - **`infra`** — anything only the infra pipeline needs (`TF_VAR_*`, registry/cloud
   credentials, k8s tokens). Never injected into the app.
 - **`<env>`** — always explicit: `staging` or `production`. There is no shared/cross-env
@@ -55,7 +58,7 @@ ward como fonte única.
 
 ```
 has_warranty:secrets.core.code.staging.SECRET_KEY_BASE
-has_warranty:secrets.core.code.production.NEON_DATABASE_URL
+has_warranty:secrets.core.code.production.RESEND_API_KEY
 myapp:secrets.core.infra.staging.TF_VAR_api_url
 commons:secrets.core.infra.staging.eks_access_key    # shared vault, same depth → unions
 ```

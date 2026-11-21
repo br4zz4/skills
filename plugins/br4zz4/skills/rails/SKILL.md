@@ -16,7 +16,7 @@ Principles and laws live in `br4zz4:architecture`. This skill is the Rails appli
 # Gemfile
 gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.1.0"
 gem "lucid-tenancy", github: "br4zz4/lucid-tenancy", tag: "v0.2.0" # multi-tenant apps only
-gem "solid_queue"
+gem "solid_queue" # only when the project cannot take Cloud Tasks (see "Queue: Cloud Tasks by default")
 gem "solid_cache"
 # with RabbitMQ: gem "bunny" (publish) + gem "sneakers" (consume)
 ```
@@ -38,19 +38,19 @@ end
   config.eager_load_paths << path
 end
 
-config.active_job.queue_adapter = :solid_queue
+config.active_job.queue_adapter = ENV.fetch("ACTIVE_JOB_ADAPTER") { Rails.env.test? ? "test" : "async" }.to_sym # cloud_tasks in staging/production
 config.cache_store = :solid_cache_store
 ```
 
 ```yaml
-# config/recurring.yml — Solid Queue recurring tasks
+# config/recurring.yml — Solid Queue recurring tasks (Solid Queue projects only; with Cloud Tasks the crons are Cloud Scheduler jobs)
 production:
   event_relay:
     class: EventRelayJob
     schedule: every minute
 ```
 
-Cache (`solid_cache`), queue (`solid_queue`) and ActionCable (`solid_cable`) live in Postgres (own databases), never Redis. A project on a specific platform (e.g. Cloud Tasks) records the exception in an ADR.
+Cache (`solid_cache`) and ActionCable (`solid_cable`) live in Postgres (own databases), never Redis. The queue is **Cloud Tasks + Cloud Scheduler** by default (see "Queue: Cloud Tasks by default"); Solid Queue (`solid_queue`, own database) is the exception for a project that cannot take push delivery (a job longer than the 30 min dispatch deadline, or a runtime outside Cloud Run) and records it in an ADR.
 
 Environment variables name what a thing is, never the implementation behind it: `DATABASE_URL`, `CACHE_URL`, `QUEUE_URL`, `CABLE_URL`, not `REDIS_URL`. Production and staging turn the cache on only when `CACHE_URL` is set (null store otherwise) and use Solid Cable only when `CABLE_URL` is set (`async` adapter otherwise), so a deploy never breaks for a missing database. Declare each Solid database in `database.yml` only when its URL is present, set `config.cache_store` in `config/environments/*.rb` (an initializer runs after `Rails.cache` is built), and keep the custom `db:migrate` creating each Solid table only when missing (`db:cache:prepare`, `db:cable:prepare`): a schema load on every deploy would wipe the cache and the sessions stored in it.
 
@@ -582,6 +582,26 @@ One Cloud Run service serves every tenant; the tenant is the host, the schema is
 - Reserve subdomains (`www`, `admin`, `avo`, `api`, `app`, `staging`, `production`) and validate a single DNS label on create.
 - Cloudflare needs `Zone:Read` and `DNS:Edit` on the zone; the runtime service account needs `roles/run.admin`, and the domain must be verified for it in Search Console.
 - A host that resolves to the wrong tenant shows the school's 404: check the `organizations` table of that environment first, then the logs of `TenantMiddleware`. The log line prints `request.subdomain`, not the value the resolver used.
+
+### Queue: Cloud Tasks by default
+
+Cloud Tasks delivers each job as an authenticated HTTP POST to a private `worker` Cloud Run service (same image and module as `web`, `APP_ROLE=worker`, no custom `command`); Cloud Scheduler posts `{"job":"<name>"}` to the same endpoint for crons. Nothing polls the database, so the worker scales to zero and Neon can suspend.
+
+- `ACTIVE_JOB_ADAPTER=cloud_tasks` in staging and production, `async` in development, `test` in the tests; the adapter reads `CLOUD_TASKS_QUEUE_PATH`, `CLOUD_TASKS_TARGET_URL` and `CLOUD_TASKS_SA_EMAIL` and sets `dispatch_deadline` to 1800 s.
+- `POST /tasks/worker` answers 404 unless `APP_ROLE=worker` (the web service is public), 415 without JSON, 422 for an unknown job or invalid payload (never a retry), 503 when the job raises (the queue redelivers with backoff, 5 attempts).
+- Terraform: queue (`max_attempts 5`, `max_retry_duration 3600s`), a `queue-invoker` and a `scheduler` service account with `run.invoker` on the worker, `cloudtasks.enqueuer` plus `serviceAccountUser` for the web service account, token creator for the Cloud Tasks service agent. Enable `cloudtasks` and `cloudscheduler` APIs and grant the CI service account `cloudtasks.admin` and `cloudscheduler.admin` **before** the first deploy that creates the queue (apply it with `-target`): the first attempt right after enabling the API answers 403 and the retries fall inside the propagation window.
+- The worker URL is deterministic (`https://<service>-<project number>.<region>.run.app`), so web and worker can both receive it without a cycle.
+
+### Deploy default: Cloud Run + Neon
+
+- **Region match.** Cloud Run `us-west1` pairs with Neon `aws-us-west-2`. Neon cannot move a project between regions: a wrong region means a new project plus `pg_dump`/`pg_restore`.
+- **Neon is created by Terraform** (`neondatabase/neon`, one project per environment, `prevent_destroy`, databases `<app>`, `<app>_cache`, `<app>_cable`), and Terraform writes `DATABASE_URL`, `CACHE_URL` and `CABLE_URL` into Secret Manager. They never live in ward, and the secret-push script must skip those three keys and never prune them. Provider notes: the project resource does not expose the role password, so read it from `GET /projects/{id}/branches/{branch}/roles/{role}/reveal_password` through the `http` data source (`store_password = true`, mark the body `sensitive`); use `primary_compute.host` and `branch.id` (the `database_host` and `default_branch_id` attributes are deprecated).
+- **Direct endpoint only.** Tenancy switches schema with `SET search_path`, which leaks between clients behind PgBouncer (`-pooler`). Fail the boot when `DATABASE_URL`, `CACHE_URL` or `CABLE_URL` contains `-pooler`. Connection ceiling: `max_instances` × pool of each service plus the migrate job must stay under the compute limit (105 at 0.25 CU).
+- **Let Neon sleep.** No periodic query without a user: worker without polling, `/up` without the database, crons at most daily, `cpu_idle = true` on web and worker.
+- **Sessions in Active Record** (`activerecord-session_store`, `tenancy :shared` table): the cookie store breaks StimulusReflex and the cache store evicts by size and age and logs users out.
+- **Web `timeout = 3600s`** so the StimulusReflex websocket is not cut every 2 minutes, `startup_cpu_boost = true`.
+- **Artifact Registry** cleanup policy keeping the 10 most recent images plus deleting older ones.
+- **Terraform vs. named revisions.** If the deploy creates revisions with `--revision-suffix`, a Terraform update that re-sends the stored revision name with a new configuration fails with `409 Revision named ... with different configuration already exists`. Never pin `template.revision`; fix it in the module, not in the deploy.
 
 ### Neon: backup is history, not a copy
 
