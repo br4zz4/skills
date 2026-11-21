@@ -1,12 +1,12 @@
 ---
 name: finish
 description: Use when implementation is complete and you need to integrate the work and clean up.
-version: 2.4.0
+version: 2.5.0
 ---
 
 # br4zz4:finish
 
-> **TLDR**: Suíte verde → DoD marcado → docs → integra conforme `integration:` do repo (sem perguntar) → devolve a sessão à raiz → remove a worktree → apaga a branch → imprime o banner FINISHED. Nada é integrado nem removido com testes vermelhos.
+> **TLDR**: Suíte verde → DoD marcado → docs → integra conforme `integration:` do repo (sem perguntar) → devolve a sessão à raiz → remove a worktree → apaga a branch → deixa a main atualizada → imprime o banner FINISHED. Nada é integrado nem removido com testes vermelhos.
 
 ---
 
@@ -113,6 +113,16 @@ Only when the work is integrated (merged, or PR pushed) **and** the worktree has
    ```bash
    git worktree prune
    ```
+
+6. **Update `main` in the repo root** (always, in both integration modes):
+
+   ```bash
+   git -C <repo-root> checkout main
+   git -C <repo-root> pull --rebase origin main
+   git -C <repo-root> status -sb
+   ```
+
+   `status` must show `main` clean and with no ahead/behind. For `integration: pr` with the PR not merged yet, `main` is still updated (nothing new to pull is fine); pull again once the user reports the merge.
 
 For `integration: pr`, keep the local branch until the PR is merged; only the worktree is removed.
 
