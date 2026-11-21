@@ -1,12 +1,12 @@
 ---
 name: rails
 description: Use when writing or reviewing Rails code.
-version: 1.9.0
+version: 1.10.0
 ---
 
 # commons:rails
 
-> **TLDR**: Arrow Architecture in Rails — `core/ports/bridges/platform` folders, lucid-case use cases named as the business speaks, explicit orchestration (no `flow`), async effects via transactional outbox, Solid Cache and Solid Queue on Postgres.
+> **TLDR**: Arrow Architecture in Rails — `core/ports/bridges/platform` folders, lucid-case cases (`app/core/cases`) named as the business speaks, explicit orchestration (no `flow`), async effects via the lucid-case transactional outbox (`emit`, `Subscriber`), Solid Cache and Cloud Tasks (or Solid Queue) on Postgres.
 
 Principles and laws live in `br4zz4:architecture`. This skill is the Rails application of them.
 
@@ -14,7 +14,7 @@ Principles and laws live in `br4zz4:architecture`. This skill is the Rails appli
 
 ```ruby
 # Gemfile
-gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.1.0"
+gem "lucid-case", github: "br4zz4/lucid-case", tag: "v0.2.0"
 gem "lucid-tenancy", github: "br4zz4/lucid-tenancy", tag: "v0.2.0" # multi-tenant apps only
 gem "solid_queue" # only when the project cannot take Cloud Tasks (see "Queue: Cloud Tasks by default")
 gem "solid_cache"
@@ -25,15 +25,13 @@ gem "solid_cache"
 # config/application.rb — every app/* subdir is already an autoload root;
 # nested roots need registering so folder names never become namespaces:
 # core/models/cart.rb → Cart (not Models::Cart)
-# core/use_cases/cart/checkout.rb → Cart::Checkout (not UseCases::Cart::Checkout)
-%w[core/models core/use_cases].each do |dir|
+# core/cases/cart/checkout.rb → Cart::Checkout (not Cases::Cart::Checkout)
+# app/core and app/ports never become namespaces: they only hold autoload roots
+%w[
+  core/models core/models/concerns core/cases
+  ports/controllers ports/controllers/concerns ports/reflexes ports/jobs ports/channels ports/serializers
+].each do |dir|
   path = root.join("app/#{dir}")
-  config.autoload_paths << path
-  config.eager_load_paths << path
-end
-
-%w[controllers jobs consumers serializers].each do |dir|
-  path = root.join("app/ports/#{dir}")
   config.autoload_paths << path
   config.eager_load_paths << path
 end
@@ -42,13 +40,9 @@ config.active_job.queue_adapter = ENV.fetch("ACTIVE_JOB_ADAPTER") { Rails.env.te
 config.cache_store = :solid_cache_store
 ```
 
-```yaml
-# config/recurring.yml — Solid Queue recurring tasks (Solid Queue projects only; with Cloud Tasks the crons are Cloud Scheduler jobs)
-production:
-  event_relay:
-    class: EventRelayJob
-    schedule: every minute
-```
+Add `ports/consumers` to the list when the app consumes a broker. Keep `app/views`, `app/helpers`, `app/assets` and `app/javascript` where Rails expects them. `test/` mirrors `app/` (`test/core/cases/cart/checkout_test.rb`, `test/ports/controllers/...`).
+
+Events: generate the outbox with `bin/rails g lucid:case:events` and keep subscribers in a directory listed in `config.events.load_paths` (the gem default is `app/models`; point it at `app/core/cases` when subscribers live there). Details in "Platform — events".
 
 Cache (`solid_cache`) and ActionCable (`solid_cable`) live in Postgres (own databases), never Redis. The queue is **Cloud Tasks + Cloud Scheduler** by default (see "Queue: Cloud Tasks by default"); Solid Queue (`solid_queue`, own database) is the exception for a project that cannot take push delivery (a job longer than the 30 min dispatch deadline, or a runtime outside Cloud Run) and records it in an ADR.
 
@@ -70,11 +64,11 @@ app/
     models/              # entities: state + invariants
       cart.rb            # Cart (ActiveRecord)
       order.rb
-      event.rb           # fact record
-    use_cases/           # actions: entry points and steps, by noun
-      cart/checkout.rb   # Cart::Checkout — use case (entry point)
+    cases/               # actions: entry points and steps, by noun
+      cart/checkout.rb   # Cart::Checkout — case (entry point)
       cart/checkout/validate_stock.rb  # flow-private step
       payment/charge.rb  # reusable noun-level verb
+      order/on_placed.rb # Lucid::Case::Subscriber — a reaction to a fact
   bridges/               # outside parties' knowledge (both directions)
     hotmart/payment_status.rb
     hotmart/verify_signature.rb
@@ -82,15 +76,15 @@ app/
     mailers/order_confirmation.rb
     rabbit/publish.rb    # broker protocol (AMQP)
     webhooks/deliver.rb  # outbound webhook to partners
-  platform/              # transport: connects one arrow to the next
-    subscriptions.rb     # the map: which fact triggers which reactions
-    event_relay_job.rb
-    event_handler_job.rb
-    dead_letter.rb
+  platform/              # transport machinery the gem does not cover
+    cloud_tasks/         # queue adapter and the worker endpoint's plumbing
+    relay_pending_events_job.rb  # scheduled sweep: Lucid::Case::Events.relay_pending
   ports/                 # our surface
     controllers/checkouts_controller.rb
     controllers/webhooks/hotmart_controller.rb
+    reflexes/
     jobs/
+    channels/
     consumers/order_events_consumer.rb
     serializers/order_serializer.rb
 ```
@@ -129,7 +123,9 @@ class CheckoutsController < ApplicationController
 end
 ```
 
-Serializers are ports (they translate core → HTTP shape), not libs. Jobs and consumers follow the same shape: deserialize, call one use case, translate the result to the transport's vocabulary (retry/ack/requeue).
+Serializers are ports (they translate core → HTTP shape), not libs. Jobs and consumers follow the same shape: deserialize, call one use case, translate the result to the transport's vocabulary (retry/ack/requeue). Plain CRUD follows the same law: `Period::Create`, `Period::Update` and `Period::Destroy` are cases, never `@period.save` in a controller — the case is what records events and logs.
+
+**Exception — framework controllers.** Devise controllers (`users/sessions`, `users/omniauth_callbacks`) are ports that are only moved: they authenticate through Devise/Warden and do not call a case. Wrapping them saves almost nothing on a future auth swap (routes, model, Warden, helpers, views and mailers change anyway) and has to be kept in sync with every Devise upgrade. If login auditing becomes a requirement, decide it in its own ADR.
 
 ```ruby
 # app/ports/consumers/order_events_consumer.rb — broker consumer (sneakers): same shape
@@ -141,7 +137,7 @@ class OrderEventsConsumer
 
   def work(raw)
     payload = JSON.parse(raw)
-    result = Order::SendConfirmation.call(event: Event.find(payload["event_id"]))
+    result = Order::SendConfirmation.call(order_id: payload["order_id"])
     result.success? ? ack! : requeue!
   end
 end
@@ -154,9 +150,11 @@ One use case = one class (`Lucid::Case::Command` when it writes, `Lucid::Case::Q
 `flow` is banned — it hides where errors come from. Orchestration is explicit guard clauses:
 
 ```ruby
-# app/core/use_cases/cart/checkout.rb — ENTRY POINT: only composes, may cross nouns
+# app/core/cases/cart/checkout.rb — ENTRY POINT: only composes, may cross nouns
 class Cart::Checkout < Lucid::Case::Command
   attributes :cart, :payment_method
+
+  event_payload { |result| { order_id: result[:order].id } }
 
   def call!
     stock = Cart::Checkout::ValidateStock.call(cart: cart)
@@ -166,14 +164,14 @@ class Cart::Checkout < Lucid::Case::Command
     return charge if charge.failure?
 
     order = Order.create!(cart: cart, charge_id: charge[:charge_id])
-    Event.create!(name: "order.placed", payload: { order_id: order.id })
+    emit(:order_placed, order_id: order.id)
 
     success(order: order)
   end
 end
 ```
 
-A `Command` runs in a transaction by default: the order and the event commit together, and a `failure` or exception rolls both back. Use `transaction :disabled` for external I/O, independent batches, or when the case must persist its own failure.
+A `Command` runs in a transaction by default: the order and its events (the Case event `cart.checkout` and the custom `order_placed`) commit together, and a `failure` or exception rolls both back. Use `transaction :disabled` for external I/O, independent batches, or when the case must persist its own failure.
 
 Steps do one thing and never call another use case. Flow-private steps nest under the action (`Cart::Checkout::ValidateStock`); reusable verbs live at noun level (`Payment::Charge`). Entry points never call entry points — flatten, or the second flow is a reaction → event.
 
@@ -294,82 +292,64 @@ end
 
 ## Platform — events
 
-Event contract (see `br4zz4:architecture` § The core's I/O contract): name is a fact in the past tense owned by the noun whose state changed; payload carries ids and the changed fields; the row is immutable once created.
+Event contract (see `br4zz4:architecture` § The core's I/O contract): name is a fact in the past tense owned by the noun whose state changed; payload carries ids and the changed fields; the record is immutable once created. The outbox is the one shipped by `lucid-case` (`lucid_case_events`, written in the Command's transaction): never a hand-rolled `Event` model, subscriptions map, relay job or dead letter table.
 
-```ruby
-# app/core/models/event.rb — the fact: past tense, our vocabulary, immutable
-class Event < ApplicationRecord
-  attr_readonly :name, :payload, :external_id
-
-  validates :name, :payload, presence: true
-  validates :name, format: { with: /\A[a-z_]+\.[a-z_]+\z/ }   # noun.fact_in_past
-
-  scope :pending, -> { where(relayed_at: nil) }
-end
-# migration: name:string, payload:jsonb, external_id:string (unique index, null allowed),
-#            relayed_at:datetime, processed_at:datetime
+```sh
+bin/rails g lucid:case:events   # migrations + config/initializers/lucid_case_events.rb
+bin/rails db:migrate
 ```
 
 ```ruby
-# app/platform/subscriptions.rb — the routes.rb of events: fact → reactions
-module Subscriptions
-  INTERNAL = {
-    "order.placed"     => ["Order::SendConfirmation", "Inventory::Reserve"],
-    "payment.refunded" => ["Order::Cancel"]
-  }.freeze
+# the fact: emitted inside the Command, recorded in the same transaction as the data
+class Cart::Checkout < Lucid::Case::Command
+  event_payload { |result| { order_id: result[:order].id } }   # ids, never the whole record
 
-  EXTERNAL = ["order.placed", "payment.settled"].freeze
-
-  def self.internal_for(event)
-    INTERNAL.fetch(event.name, [])
-  end
-
-  def self.external?(event)
-    EXTERNAL.include?(event.name)
+  def call!
+    order = Order.create!(cart: cart)
+    emit(:order_placed, order_id: order.id)
+    success(order: order)
   end
 end
 ```
 
+Every recording Command also produces a Case event named after its class (`cart.checkout`); `emit` is for a fact the result does not tell. `emit` in a Query or Subscriber raises. Failures are recorded after the rollback; exceptions record nothing.
+
 ```ruby
-# app/platform/event_relay_job.rb — routing only: zero dialect, zero business
-class EventRelayJob < ApplicationJob
-  def perform
-    Event.pending.find_each do |event|
-      Subscriptions.internal_for(event).each do |use_case|
-        EventHandlerJob.perform_later(use_case, event.id)
-      end
-      Rabbit::Publish.call(event: event) if Subscriptions.external?(event)
-      event.update!(relayed_at: Time.current)
-    end
+# app/core/cases/order/on_placed.rb — the reaction: a case of kind :subscriber
+class Order::OnPlaced < Lucid::Case::Subscriber
+  subscribe :order_placed
+
+  def call!
+    order = Order.find(event.content[:order_id])
+    delivery = Mailers::OrderConfirmation.call(order: order)
+    return delivery if delivery.failure?
+
+    success
   end
+end
+
+# a one-liner that deserves no class
+Lucid::Case.subscribe(Order::Place, as: :confirmation_mailer) do |event|
+  OrderMailer.confirmation(event.content[:order_id]).deliver_later
 end
 ```
 
-The relay enqueues `EventHandlerJob` directly — both live in platform, no layer boundary crossed, so no wrapper. External broadcast crosses to the broker, so it goes through the bridge.
+- `subscribe` takes a Command class (Case event) or a name (custom event); `on:` picks the outcome (`:success` default, `:failure`, `:any`, a failure type); `step:` follows a step of a stepped command; `ordered: true` delivers in recording order, one at a time.
+- Delivery is at-least-once and unordered by default: a subscriber is idempotent through `event.id`, or turn on `config.events.deduplication = :enabled`. Idempotency lives in the reacting case, never in a `processed_at` column of a hand-rolled table.
+- `stale_on Dashboard::Metrics, on: Enrollment::Approve` drops a Query's cache right after the commit, in process; use a subscriber only for reactions that may run later in a job.
+- Subscribers load from `config.events.load_paths`; a directory that does not exist raises `ArgumentError`.
+- Multi-tenant apps capture the schema in `config.events.context` and restore it in `config.events.around_delivery`; point `config.events.table_name` at a table every tenant sees (`public.lucid_case_events`).
+- The outbox is not an audit trail: it purges delivered rows after `config.events.retention`. Keep your own record when you need history.
+
+External broadcast (a broker, a partner webhook) is a subscriber that calls a bridge:
 
 ```ruby
-# app/platform/event_handler_job.rb — delivers ONE reaction; retries, then dead-letters
-class EventHandlerJob < ApplicationJob
-  retry_on StandardError, wait: :polynomially_longer, attempts: 5 do |job, error|
-    use_case, event_id = job.arguments
-    DeadLetter.create!(event_id: event_id, use_case: use_case, error: error.message)
-  end
+class Order::PublishPlaced < Lucid::Case::Subscriber
+  transaction :disabled
+  subscribe :order_placed
 
-  def perform(use_case_name, event_id)
-    result = use_case_name.constantize.call(event: Event.find(event_id))
-    raise result[:error].to_s if result.failure?
-  end
-end
-```
-
-```ruby
-# app/platform/dead_letter.rb — a delivery that gave up; the fact stays intact in events
-class DeadLetter < ApplicationRecord
-  belongs_to :event
-
-  def redeliver!
-    EventHandlerJob.perform_later(use_case, event_id)
-    destroy!
+  def call!
+    Rabbit::Publish.call(name: "order.placed", payload: event.content)
   end
 end
 ```
@@ -379,14 +359,11 @@ end
 class Rabbit::Publish < Lucid::Case::Command
   transaction :disabled
 
-  attributes :event
+  attributes :name, :payload
 
   def call!
-    exchange.publish(
-      { event_id: event.id, name: event.name, payload: event.payload }.to_json,
-      routing_key: event.name, persistent: true
-    )
-    success(published: event.name)
+    exchange.publish({ name: name, payload: payload }.to_json, routing_key: name, persistent: true)
+    success(published: name)
   rescue Bunny::Exception => e
     failure(:publish_failed, error: e.message)
   end
@@ -399,28 +376,18 @@ class Rabbit::Publish < Lucid::Case::Command
 end
 ```
 
-Delivery is at-least-once on every transport — idempotency lives in the reacting use case:
+The relay runs after the commit; if the process dies between the commit and the relay, the row stays pending until the sweep runs. Schedule it (Cloud Scheduler → worker, or Solid Queue `config/recurring.yml`) with a job in `platform/`:
 
 ```ruby
-# app/core/use_cases/order/send_confirmation.rb
-class Order::SendConfirmation < Lucid::Case::Command
-  attributes :event
-
-  def call!
-    return success(already_processed: true) if event.processed_at.present?
-
-    order = Order.find(event.payload["order_id"])
-
-    delivery = Mailers::OrderConfirmation.call(order: order)
-    return delivery if delivery.failure?
-
-    event.update!(processed_at: Time.current)
-    success(order: order)
+# app/platform/relay_pending_events_job.rb
+class RelayPendingEventsJob < ApplicationJob
+  def perform
+    Lucid::Case::Events.relay_pending
   end
 end
 ```
 
-`constantize` receives only `Subscriptions` strings, never external input. Solid Queue enqueues are transactional (Postgres), and side effects of a `Command` (jobs, mail, notifications) go in its `after_commit` so they never fire for a rolled-back write — do not use either to skip the Event table: you lose the fact record, the subscriptions map and the broker route.
+Test events with `include Lucid::Case::TestHelpers` (`assert_event`, `assert_no_event`, `capture_events`) and call a subscriber directly with `Order::OnPlaced.call(event: event)`. Side effects of a `Command` that must not exist for a rolled-back write (jobs, mail) go in its `after_commit`; an effect that does not belong to the response is an event, never a direct call.
 
 ## Webhooks
 
@@ -438,7 +405,7 @@ end
 ```
 
 ```ruby
-# app/core/use_cases/webhook/receive.rb — entry point: verify, translate, record the fact, answer fast
+# app/core/cases/webhook/receive.rb — entry point: verify, translate, record the fact, answer fast
 class Webhook::Receive < Lucid::Case::Command
   attributes :headers, :payload
 
@@ -449,11 +416,8 @@ class Webhook::Receive < Lucid::Case::Command
     parsed = Hotmart::ParseWebhook.call(payload: payload)
     return success(ignored: true) if parsed.failure?
 
-    Event.create!(
-      name: parsed[:name],
-      payload: parsed[:payload],
-      external_id: parsed[:external_id]
-    )
+    WebhookReceipt.create!(external_id: parsed[:external_id])   # unique index: a redelivered webhook is a duplicate
+    emit(parsed[:name], **parsed[:payload])
     success(received: true)
   rescue ActiveRecord::RecordNotUnique
     success(duplicate: true)
@@ -702,5 +666,6 @@ end
 - Any business `if` in a controller?
 - Any core file mentioning HTTP, params, or vendor names?
 - Any use case crossing nouns without being the entry point?
-- Every async effect an `Event`?
+- Every async effect an event (`emit` + `Lucid::Case::Subscriber`), never a direct call or a `after_commit` enqueue?
+- Does every controller (except Devise) call exactly one case, with no `save`/`update`/`destroy` on a model?
 - Every outside call wrapped in a bridge returning `success/failure`?

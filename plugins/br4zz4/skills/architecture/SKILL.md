@@ -1,7 +1,7 @@
 ---
 name: architecture
 description: Use when designing or writing application/backend code organized in ports/core/bridges/platform (use cases, events, outbox). Not for scripts, dotfiles or config.
-version: 1.1.0
+version: 1.2.0
 ---
 
 # br4zz4:architecture
@@ -39,7 +39,7 @@ Each layer is a real folder. What defines it is the **knowledge the code holds**
 
 ### Core laws
 
-1. Every port calls exactly one use case: the **entry point** — the feature in code
+1. Every port calls exactly one use case: the **entry point** — the feature in code (a port that only hands off to a framework, such as a Devise controller, is exempt)
 2. Only the entry point may cross nouns — it is the mediator that sees the whole map
 3. A **step** never calls another use case; it touches only its own noun's entities
 4. Entry points never call entry points — flatten the steps, or the second flow is a reaction → event
@@ -71,7 +71,7 @@ Checkout:
 
 ### Organization inside a layer
 
-Inside the core, entities sit in `models/` and actions in `use_cases/`, organized by business noun (`use_cases/cart/checkout`, `use_cases/payment/charge`). Technical folders organize files, never names: the action is `Cart::Checkout`, never `UseCases::Cart::Checkout` — only business nouns appear in a name. Layer folders separate who may depend on whom. Subdomains stay flat until a cluster of nouns clearly forms a bigger context — only then add one namespace level.
+Inside the core, entities sit in `models/` and actions in `cases/`, organized by business noun (`cases/cart/checkout`, `cases/payment/charge`). Technical folders organize files, never names: the action is `Cart::Checkout`, never `Cases::Cart::Checkout` — only business nouns appear in a name. Layer folders separate who may depend on whom. Subdomains stay flat until a cluster of nouns clearly forms a bigger context — only then add one namespace level.
 
 ### Business semantics
 
@@ -84,7 +84,7 @@ The file tree must be readable by a PM; actions are named noun + verb (`Cart::Ad
 
 ### Events — transactional outbox
 
-Core never calls ports. An async effect = record a fact (event row) **in the same transaction** as the state change. A relay (platform) selects pending events, checks the subscriptions map and enqueues one job per reaction; events with an external audience go out through the broker bridge. Delivery is at-least-once on every transport → reactions are idempotent (processed check). Swapping broker only changes the bridge; the subscriptions map and the core stay as they are.
+Core never calls ports. An async effect = record a fact (event row) **in the same transaction** as the state change. A relay selects pending events and hands each one to the subscribed reactions, one job per reaction; events with an external audience go out through a subscriber that calls the broker bridge. Delivery is at-least-once on every transport → reactions are idempotent (`event.id` check). Swapping broker only changes the bridge; the subscriptions and the core stay as they are. The reference implementation is the `lucid-case` outbox (`emit`, `Lucid::Case::Subscriber`, `Lucid::Case::Events.relay_pending`, see `br4zz4:rails`); a project that does not use the gem builds the same contract by hand, with the relay and the subscriptions map in `platform/`.
 
 Event contract:
 
