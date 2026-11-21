@@ -659,10 +659,27 @@ end
 - Fixtures and factories carry only the bulk of a record, with fixed values (no Faker, no random ERB). Whatever the test result depends on is explicit in the arrange: `Model.new(...)`, `Model.create!(...)` or `update!` over a fixture. Faker is allowed inside tests only.
 - Multi-tenant apps (`lucid-tenancy`): fixtures only for tenant tables, loaded with the test tenant already set at boot; shared tables are created inline. `include Lucid::Tenancy::Minitest` plus `tenant "name"` sets the tenant per test case.
 
+### Tests in CI
+
+The pipeline calls three hooks of the code side, each a `run/<name>` script (`br4zz4/pipelines`: `test` in the pull request, `regression` and `e2e` in the promote after a green staging deploy):
+
+- `run/test` — in a pull request it receives `BASE_SHA` (the merge-base) and runs only the tests the change touches; with `BASE_SHA` empty (main, dispatch) it runs everything. Map by convention (`app/x.rb` → `test/x_test.rb`) and run everything when the diff touches `Gemfile.lock`, `config/**`, `db/**`, `test/test_helper.rb`, `test/support/**`, `test/fixtures/**` or a `.rb` file without a test. `retest` stays a local watcher (`run/test.watch`); the smarter selection is tracked in br4zz4/pipelines#16.
+- `run/regression` — the whole suite and the slow tests (`bin/rails test:all`, system tests included), prepared exactly like `run/test`, with the `test` ward scopes.
+- `run/e2e` — real tests against the live staging release, with the `staging` ward scopes and `TARGET_URL`.
+  - Tools: Capybara + Cuprite (Chrome over CDP, no chromedriver, no Node) in a `group :e2e` of the Gemfile, tests in `e2e/**/*_test.rb`, never in `test/`, so `bin/rails test` skips them.
+  - `Capybara.run_server = false` and `Capybara.app_host` built from `TARGET_URL` (a multi-tenant app prefixes the tenant subdomain). The test talks only HTTP and the browser, never the database: it acts as a real user.
+  - A dedicated test account lives in the staging ward (`E2E_EMAIL`, `E2E_PASSWORD`, plus `E2E_TENANT` when multi-tenant) and is provisioned by the infra, never created by the test run.
+  - Tests are idempotent: every record carries a unique suffix (`run-<GITHUB_RUN_ID>`) and nothing is deleted.
+  - Cover the critical paths of the product, one independent test each, so a Critical issue names the path that broke.
+  - On failure write `tmp/artifacts/failures.md` (test name, assertion, stack; no secret, no personal data) and screenshots to `tmp/artifacts/`. `tmp/artifacts/` is ignored by git and exists only on the runner.
+
+The pipeline forbids the Autofix to edit `run/`, `ci/` and `e2e/`, so the hooks and the end-to-end tests are always written by people.
+
 ## Review checklist
 
 - Would a PM understand the file tree?
 - Does every test show in its arrange what the result depends on, with no hidden `setup` data or random fixtures?
+- Does `run/test` use `BASE_SHA`, and do `run/regression` and `run/e2e` exist, with the e2e tests in `e2e/` and no database access?
 - Any business `if` in a controller?
 - Any core file mentioning HTTP, params, or vendor names?
 - Any use case crossing nouns without being the entry point?
