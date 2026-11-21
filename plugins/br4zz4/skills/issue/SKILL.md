@@ -70,6 +70,15 @@ Right after the issue exists, without asking:
 
 Stop and leave only the issue open (reporting why) when: no clear cause after **2 attempts**, the fix needs another repo or a decision from the user, or it would exceed the PR size hard limit.
 
+## Repos with the Autofix
+
+A repo whose `.github/modules.json` has the `autofix` key fixes every issue labelled `urgency:critical` by itself: the pipeline hands the issue to an agent and opens the PR (automerge) only after proving a regression test red then green. In such a repo:
+
+- Apply `module:<m>` too (the module that owns the bug); without it the autofix rejects the issue.
+- Write the body for the agent: the exact reproduction, the observed behaviour and the **expected behaviour**. It reads only the masked body and comments from maintainers.
+- Do not run Step 3b: the local agent does not open the fix PR, the Autofix does. Record the issue and keep working.
+- A `urgency:critical` label starts the run, so apply it only to what must be fixed now; `autofix:blocked` keeps a human in charge.
+
 ## Final report
 
 End the turn with a table of what was opened:
@@ -83,5 +92,5 @@ End the turn with a table of what was opened:
 
 - One issue per finding; never bundle unrelated problems
 - Never fix a `normal` issue in the middle of the current task
-- Never merge the critical PR automatically
+- Never merge the critical PR automatically (applies to the PR this skill opens; the Autofix PR enters by automerge)
 - Never include secrets or personal data in issues, PRs or comments
