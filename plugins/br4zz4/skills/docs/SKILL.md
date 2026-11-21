@@ -85,7 +85,7 @@ Se nenhuma bateu, provavelmente não é documentação. Não crie pasta nova —
 `modules/<m>/deploy/terraform/README.md`, `modules/<m>/code/**/README.md` com how-to | `guides/` | doc colocado junto do código de infra ainda é doc |
 `apps/*/README.md` com 3–8 linhas de "como testar X" | **permanece** | README convencional de módulo; migrar criaria guides quase vazios |
 `README.md` de raiz com 200+ linhas de doc operacional | dividido em `guides/` + `reference/` | a raiz fica com intro + **um** link |
-`spec/**` (RSpec), `k8s/base/specs/*.yaml` (kustomize) | **não é doc** | `specs/` em outro sentido |
+`spec/**` (RSpec), `test/**` (Minitest), `k8s/base/specs/*.yaml` (kustomize) | **não é doc** | `specs/` em outro sentido |
 `.github/PULL_REQUEST_TEMPLATE.md` | **não é doc** | mecanismo do GitHub |
 `.project/specs/template.md` | **remova** | o template vive nesta skill; uma segunda cópia cria duas fontes que divergem |
 

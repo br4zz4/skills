@@ -649,9 +649,36 @@ end
 
 O script `console.sh` injeta `DATABASE_URL` e `CONSOLE_SANDBOX` automaticamente no pod temporário — não precisa configurar manualmente.
 
+## Tests
+
+The Brazza standard for Rails apps is Minitest, mocha and fixtures. Tests live in `test/`, mirroring `app/` (`test/integration` for HTTP flows against the real database).
+
+```ruby
+class Enrollment::ApproveTest < ActiveSupport::TestCase
+  test 'approve under review creates the contract' do
+    # arrange
+    enrollment = enrollments(:under_review)
+    Contract::Generate.expects(:call).with(enrollment: enrollment).returns(stub(failure?: false))
+
+    # act
+    result = Enrollment::Approve.call(enrollment: enrollment)
+
+    # assert
+    assert_predicate result, :success?
+    mocha_verify
+  end
+end
+```
+
+- `ActiveSupport::TestCase` with `test 'description' do`. Triple-A with a comment per section in every test. No `setup` that hides data the test depends on; `setup` is only for global state (ENV, configuration).
+- mocha for stubs and expectations: `stubs`/`expects` in the arrange (`.never` for "not called"), `mocha_verify` in the assert. Use `stub(attrs).responds_like_instance_of(Klass)` for verified doubles.
+- Fixtures and factories carry only the bulk of a record, with fixed values (no Faker, no random ERB). Whatever the test result depends on is explicit in the arrange: `Model.new(...)`, `Model.create!(...)` or `update!` over a fixture. Faker is allowed inside tests only.
+- Multi-tenant apps (`lucid-tenancy`): fixtures only for tenant tables, loaded with the test tenant already set at boot; shared tables are created inline. `include Lucid::Tenancy::Minitest` plus `tenant "name"` sets the tenant per test case.
+
 ## Review checklist
 
 - Would a PM understand the file tree?
+- Does every test show in its arrange what the result depends on, with no hidden `setup` data or random fixtures?
 - Any business `if` in a controller?
 - Any core file mentioning HTTP, params, or vendor names?
 - Any use case crossing nouns without being the entry point?

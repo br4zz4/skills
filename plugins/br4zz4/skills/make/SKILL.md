@@ -39,8 +39,8 @@ include .project/make/*.mk
 O ambiente correto é o container do módulo, com as dependências de pé pelo compose. Por isso:
 
 1. **Existe target `make`? Use o target.** `make core.test`, `make core.lint`, `make core.db.migrate`, `make core.db.seed`, `make core.console`. `make help` lista tudo. Os scripts de `run/` rodam no serviço do módulo (`docker compose run --rm`), com o banco e os demais serviços de pé pelo `depends_on`.
-2. **Não existe target? Rode dentro do container**, nunca no host: `docker compose --profile tools run --rm core <comando>` (ex.: `bin/rails runner '...'`, `bundle exec rspec spec/models/x_spec.rb`, `bundle exec rake lucid:tenancy:status`). Isso é o mesmo ambiente do `make`.
-3. **Nunca rode `bundle`, `rails`, `rspec` ou `rake` direto no host** nem exporte `DATABASE_*`/`WARD_CONTEXT` à mão para fazê-los funcionar: isso testa outro ambiente (outra versão de gems, outro host de banco, sem o `ward` real) e esconde o que o dev vai encontrar. Se um comando só funciona no host com variáveis exportadas, o ambiente do container está errado e é isso que se conserta.
+2. **Não existe target? Rode dentro do container**, nunca no host: `docker compose --profile tools run --rm core <comando>` (ex.: `bin/rails runner '...'`, `bin/rails test test/models/x_test.rb`, `bundle exec rake lucid:tenancy:status`). Isso é o mesmo ambiente do `make`.
+3. **Nunca rode `bundle`, `rails` ou `rake` direto no host** nem exporte `DATABASE_*`/`WARD_CONTEXT` à mão para fazê-los funcionar: isso testa outro ambiente (outra versão de gems, outro host de banco, sem o `ward` real) e esconde o que o dev vai encontrar. Se um comando só funciona no host com variáveis exportadas, o ambiente do container está errado e é isso que se conserta.
 4. Argumentos: `make core.test ARGS="spec/models/x_spec.rb"`. Comando repetido que não tem target vira `run/<nome>` (e ganha target), não um one-liner colado em docs.
 5. O trabalho termina com o ambiente pronto: banco migrado e populado no container, imagem de dev construída, `git status` limpo, para a próxima pessoa só rodar `make core.start`.
 

@@ -110,6 +110,8 @@ Commit at phase boundaries:
 
 Tests verify behavior through public interfaces, never implementation details. Code can change entirely; tests should not. A good test reads like a specification: "customer can check out with a valid cart" names a capability and survives refactors because it ignores internal structure.
 
+Fixtures and factories carry only the bulk of a record. Every piece of data the result depends on is explicit in the test's arrange, never hidden in a fixture, a factory default or a `setup`/`let`.
+
 Examples of good and bad tests: [tests.md](tests.md). When and how to mock: [mocking.md](mocking.md).
 
 ## Seams: where tests go
