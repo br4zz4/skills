@@ -57,6 +57,19 @@ Single-module projects always name the module **`core`** (`modules/core/`). Neve
 
 All documentation lives in `docs/` at the **repo root**; its first level is a closed set (`specs/`, `plans/`, `features/`, `learnings/`, `architecture/`, `guides/`, `reference/<scope>/`, `rules/<scope>/` plus `README.md`, `RULES.md`, `modules.md`). Never `.project/docs/`, `modules/<m>/docs/` or a free-form folder at level 1. Layout, routing table and naming: skill `br4zz4:docs`.
 
+## Resource naming carries the module
+
+Every cloud project, Neon project and database name includes the module name, so a second module never collides with the first. Single-module projects use `core`.
+
+| Resource | Pattern | Example |
+|----------|---------|---------|
+| GCP project, Neon project (one per environment) | `<app>-<module>--<env>` | `lunetamagica-core--staging` |
+| Cloud Run service, job, queue, service account prefix | `<app>-<module>--<env>-<role>` | `lunetamagica-core--staging-web` |
+| Database (underscores) | `<app>_<module>`, `<app>_<module>_cache`, `<app>_<module>_cable` | `lunetamagica_core` |
+| Terraform state bucket | `<app>-<module>-tfstate-<env>` | `lunetamagica-core-tfstate-staging` |
+
+The double dash separates the environment from the rest. Applies to new projects only; existing ones keep their names until a planned migration, because GCP project ids and Neon projects cannot be renamed.
+
 ## The .commons submodule
 
 `.commons` is a **git submodule** of `br4zz4/commons`, pinned at the `v1` tag:
