@@ -64,11 +64,11 @@ Every cloud project, Neon project and database name includes the module name, so
 | Resource | Pattern | Example |
 |----------|---------|---------|
 | GCP project, Neon project (one per environment) | `<app>-<module>--<env>` | `lunetamagica-core--staging` |
-| Cloud Run service, job, queue, service account prefix | `<app>-<module>--<env>-<role>` | `lunetamagica-core--staging-web` |
+| Cloud Run service, job, queue, service account | `<app>-<module>-<role>--<env>` | `lunetamagica-core-web--staging` |
 | Database (underscores) | `<app>_<module>`, `<app>_<module>_cache`, `<app>_<module>_cable` | `lunetamagica_core` |
-| Terraform state bucket | `<app>-<module>-tfstate-<env>` | `lunetamagica-core-tfstate-staging` |
+| Terraform state bucket | `<app>-<module>-tfstate--<env>` | `lunetamagica-core-tfstate--staging` |
 
-The double dash separates the environment from the rest. Applies to new projects only; existing ones keep their names until a planned migration, because GCP project ids and Neon projects cannot be renamed.
+The double dash always comes last and separates the environment from the rest (`<what>--<env>`), so `*--staging` selects everything of one environment. Applies to new projects only; existing ones keep their names until a planned migration, because GCP project ids and Neon projects cannot be renamed.
 
 ## The .commons submodule
 
