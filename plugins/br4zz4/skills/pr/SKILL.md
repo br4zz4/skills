@@ -65,6 +65,7 @@ gh pr merge <n> --squash   # when the PR's commits are noise
 gh pr merge <n> --rebase   # when the commits are atomic and history must stay linear
 ```
 
+- Merging into `main` is always authorized once CI is green; never on a red check. In a shell loop use an array or a `for` over a list (zsh does not word-split a quoted string like `"21 22"`).
 - Stacked PRs: merge in sequence order. With a normal merge the next PR needs no rebase (its base branch is already an ancestor of `main`); retarget it to `main` and merge. With squash or rebase, rebase the next PR onto `main` first, because the commits change identity.
 - If a repo's ruleset requires linear history, normal merge is unavailable: use `--rebase`.
 
@@ -114,4 +115,4 @@ After opening the PR, always ask:
 - When splitting, two PRs may touch the same file — what matters is that each PR is consistent and atomic, not that files are exclusive
 - Stacked PRs: base of PR n+1 is the branch of PR n; the `## SEQUENCE` section lists them in merge order
 - Merge with `--merge` by default; squash or rebase when the repo ruleset or the PR's commits call for it
-- Pode pushar a branch e abrir o PR direto, **sem pedir autorização antes** — o usuário autorizou a criação de PRs. Merge continua sendo decisão explícita do usuário.
+- Pode pushar a branch e abrir o PR direto, **sem pedir autorização antes** — o usuário autorizou a criação de PRs. Merge na `main` (e staging) também é autorizado de forma permanente: depois do CI verde, mergeie (`--merge`, na ordem da pilha). Nunca produção.

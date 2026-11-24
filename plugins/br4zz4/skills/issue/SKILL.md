@@ -65,7 +65,7 @@ Right after the issue exists, without asking:
 2. **Red first:** the **tester** writes the failing test that reproduces it (`br4zz4:tdd`), without reading the implementation.
 3. **Fix** at the source (see "fix at the origin" rules: own code in the owning repo, never a workaround in the consumer).
 4. **Verify:** `br4zz4:verify`, full suite green.
-5. **PR:** apply `br4zz4:pr` with `Fixes #<n>` in the body and the `urgency:critical` label. Never merge it yourself.
+5. **PR:** apply `br4zz4:pr` with `Fixes #<n>` in the body and the `urgency:critical` label. Merge it yourself only when its CI is green (merging into `main`/staging is always authorized; never production).
 6. **Comment** the PR link on the issue.
 
 Stop and leave only the issue open (reporting why) when: no clear cause after **2 attempts**, the fix needs another repo or a decision from the user, or it would exceed the PR size hard limit.
@@ -92,5 +92,5 @@ End the turn with a table of what was opened:
 
 - One issue per finding; never bundle unrelated problems
 - Never fix a `normal` issue in the middle of the current task
-- Never merge the critical PR automatically (applies to the PR this skill opens; the Autofix PR enters by automerge)
+- Merge the critical PR only with green CI; never on a red check (the Autofix PR enters by automerge)
 - Never include secrets or personal data in issues, PRs or comments

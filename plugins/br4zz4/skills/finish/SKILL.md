@@ -72,6 +72,8 @@ git push -u origin <branch>
 
 Then apply `br4zz4:pr`. For stacked PRs, open them in the spec's sequence order. After opening, offer a review only if the reviewer has not already run for this spec.
 
+Merging into `main` (and so into staging) is always authorized: once a PR's CI is green, merge it with a normal merge (`gh pr merge <n> --merge`), in the stack's order, retargeting each next PR to `main` (`gh pr edit <n> --base main`) and waiting for `CLEAN`. Never merge on a red check (fix at the origin), never force-push, never go to production.
+
 ### `integration: main`
 
 Commits go straight to `main` with immediate push:
@@ -122,9 +124,9 @@ Only when the work is integrated (merged, or PR pushed) **and** the worktree has
    git -C <repo-root> status -sb
    ```
 
-   `status` must show `main` clean and with no ahead/behind. For `integration: pr` with the PR not merged yet, `main` is still updated (nothing new to pull is fine); pull again once the user reports the merge.
+   `status` must show `main` clean and with no ahead/behind. After the builder merges the PR(s), pull again so `main` carries them; check the CI of `main` (`gh run list --branch main --limit 1`).
 
-For `integration: pr`, keep the local branch until the PR is merged; only the worktree is removed.
+For `integration: pr`, delete the local branch once the PR is merged (the builder merges it).
 
 After cleanup, `git status` and `.worktrees/` must have no leftovers.
 
@@ -135,7 +137,7 @@ After cleanup, `git status` and `.worktrees/` must have no leftovers.
 Merging on `main` is what deploys to staging. After integration, ping the created/edited screens as described in `## Staging` of `AGENTS.md`, or report `staging: none`.
 
 - `integration: main`: ping right after the push.
-- `integration: pr`: report "aguardando merge"; ping once the user says the PR was merged.
+- `integration: pr`: the builder merges the PR when CI is green, then pings.
 - A failed ping is not rolled back: fix forward with a new commit/PR, or report it. Mark the staging item of the spec's DoD only with a successful ping.
 
 ---
