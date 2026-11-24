@@ -28,7 +28,7 @@ include .project/make/*.mk
 | `<m>.shell` `<m>.db` `<m>.keys` | shell, `psql "$DATABASE_URL"`, nomes das chaves do escopo |
 | `<m>.remote` `<m>.secrets` | `<infra>/ops/remote.sh`, Secret push via `<infra>/ops/secrets.sh` |
 | `up` `down` `logs` | serviços do compose |
-| `conform` `github.setup` `commons.update` | validação do projeto, config do GitHub, atualização do submodule |
+| `conform` `git.origin.setup` `commons.update` | validação do projeto, config do GitHub, atualização do submodule |
 
 - O nome do target é o nome do arquivo em `run/` sem prefixo: `run/db.seed` vira `make core.db.seed` (não existe `core.run.seed`).
 - Argumentos: `ARGS="..."`. Ambiente: `ENV=` (default por tipo de comando, vindo do `commons.ctx`). Ambiente restrito pede `CONFIRM=<projeto>` fora de TTY.
