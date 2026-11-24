@@ -28,7 +28,7 @@ Do not ask the user which option to use; the rule decides. Ask only when the wor
 
 ## Step 1 — Verify tests
 
-Run the full test suite (ask the **tester** to run it twice in a row when working from a spec):
+Run the full test suite (ask the **tester** to run it once when working from a spec):
 
 ```bash
 <test command>
@@ -170,10 +170,10 @@ Printed as the **last output of every turn while a spec is being executed**, not
 ║                                          ║
 ║  spec: docs/specs/<file>.md              ║
 ║  ████████████░░░░░░░░  4/7 (57%)         ║
-║  pausa: aguardando tester (green 2×)     ║
+║  pausa: aguardando tester (green)     ║
 ║                                          ║
 ║  ✔ tasks do how (4/4)                    ║
-║  ✔ testes verdes 2×                      ║
+║  ✔ testes verdes                        ║
 ║  ✔ review                                ║
 ║  ✔ integração (PR #123 aberto)           ║
 ║  ☐ merge do PR #123                      ║

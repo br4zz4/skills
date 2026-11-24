@@ -155,7 +155,7 @@ Tests belong to the **tester**; production code belongs to the **builder** and *
 |-------|-------|
 | RED — write the failing tests from the Gherkin `## acceptance criteria`, without reading the new implementation | tester |
 | GREEN — minimal implementation | builder / intern |
-| Verify GREEN — full suite, 2× in a row | tester |
+| Verify GREEN — full suite, once | tester |
 | REFACTOR — production code only; tests stay green | builder / intern |
 
 Need a new or changed test during implementation → ask the tester; never edit it yourself.

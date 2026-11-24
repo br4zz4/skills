@@ -21,7 +21,7 @@ Delegue SÓ quando: (1) contexto isolado real, (2) paralelização real (arquivo
 |--------|------|--------|-------|-------|
 | **builder** | primary (padrão) | sonnet#medium | Codifica, orquestra, finaliza | tudo, menos teste |
 | **intern** | subagent | sonnet#medium | Executa UMA task com lista de arquivos fechada | tudo, menos teste |
-| **tester** | subagent | sonnet#medium | Red a partir do Gherkin; green 2× | SÓ teste |
+| **tester** | subagent | sonnet#medium | Red a partir do Gherkin; green (1 rodada) | SÓ teste |
 | **reviewer** | subagent | opus#medium | Revisa diff + spec; read-only | nada |
 | **explore** | subagent | haiku#low | Busca read-only | nada |
 | **spec** | primary | opus#high | Entrevista e escreve specs | `docs/**` |
