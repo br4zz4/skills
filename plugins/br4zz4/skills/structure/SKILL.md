@@ -64,11 +64,14 @@ Every cloud project, Neon project and database name includes the module name, so
 | Resource | Pattern | Example |
 |----------|---------|---------|
 | GCP project, Neon project (one per environment) | `<app>-<module>--<env>` | `lunetamagica-core--staging` |
-| Cloud Run service, job, queue, service account | `<app>-<module>-<role>--<env>` | `lunetamagica-core-web--staging` |
+| Cloud Run service, job, queue | `<app>-<module>-<role>--<env>` | `lunetamagica-core-web--staging` |
+| Service account (30-char limit) | `<app>-<module>-<role>-<env3>` | `lunetamagica-core-worker-stg` |
 | Database (underscores) | `<app>_<module>`, `<app>_<module>_cache`, `<app>_<module>_cable` | `lunetamagica_core` |
 | Terraform state bucket | `<app>-<module>-tfstate--<env>` | `lunetamagica-core-tfstate--staging` |
 
-The double dash always comes last and separates the environment from the rest (`<what>--<env>`), so `*--staging` selects everything of one environment. Applies to new projects only; existing ones keep their names until a planned migration, because GCP project ids and Neon projects cannot be renamed.
+The double dash always comes last and separates the environment from the rest (`<what>--<env>`), so `*--staging` selects everything of one environment.
+
+Service account ids hold at most 30 characters, so they cannot carry `--<env>`: use the 3-letter environment code (`stg`, `prd`, `dev`) and keep `<app>`, `<module>` and `<role>` short enough that `lunetamagica-core-migrate-stg` (29) fits; if it still does not, shorten the role (`mig`), never the module. Applies to new projects only; existing ones keep their names until a planned migration, because GCP project ids and Neon projects cannot be renamed.
 
 ## The .commons submodule
 
