@@ -160,6 +160,18 @@ Tests belong to the **tester**; production code belongs to the **builder** and *
 
 Need a new or changed test during implementation → ask the tester; never edit it yourself.
 
+## Fast loop: `run/test.diff`
+
+While implementing, run only the tests related to what changed, not the whole suite. Every project exposes this as `run/test.diff` (or the project's `make <module>.test.diff`); it runs the tests of the files changed since the merge-base with `origin/main`, plus uncommitted and untracked files. The full suite runs once at the end (`Verify GREEN`).
+
+This skill ships a generic script, `test.diff`, next to this file. Copy it to `run/test.diff` (`chmod +x`) in a project that has none:
+
+- It maps each changed `.rb` (paths relative to the current directory, so it works from a monorepo module) to its `*_test.rb`/`*_spec.rb` by file name, then runs them with `rspec` (specs), `bin/rails test` (Rails) or plain `ruby -Itest -Ilib` (Minitest). No dependency on any gem.
+- `retest` is opt-in (`TEST_DIFF_RETEST=1`, Rails apps only): `retest` 2.5.0 crashes with `exit nil` when it cannot resolve a test (it resolves paths from the repo root, so it fails in a monorepo module) and its `--rake` setup builds a wrong path in gem repos. Prefer the default.
+- Argument: an optional base ref (default: merge-base with `origin/main`). No matching test prints a message and exits 0.
+
+Builder and tester call it after every task; a change to a shared helper or config still needs the full suite.
+
 ## Executing a spec
 
 When working from a `docs/specs/` file, follow its `# how` in order:
